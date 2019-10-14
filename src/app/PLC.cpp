@@ -11,16 +11,14 @@ PLC::PLC(std::string EngName, AutoPtr<AbstractConfiguration> _config, Notificati
 EngName(EngName), logger(Logger::get(EngName)), config(_config), nc(_nc), np({EngName, ("/tmp/"+EngName+".pipe").c_str(), Utility::FIFO(("/tmp/"+EngName+".pipe").c_str())})
 {
 	// TODO Auto-generated constructor stub
-	//PLC::pconfig = new IniFileConfiguration("AutoCG_Server.ini");
 }
 
 PLC::~PLC() {
 	// TODO Auto-generated destructor stub
 }
 
-void PLC::Load(std::string fileName)
+void PLC::Load()
 {
-	logger.information("Load %s", fileName);
 	MultipleAreaRead MultipleAreaRead_temp;
 	MultipleAreaRead_temp.area = MemoryTypeIndex("EM");
 	MultipleAreaRead_temp.hex_as_dec = false;
@@ -225,8 +223,6 @@ void PLC::Load(std::string fileName)
 	PLC_DATA.DATA_RATIO.push_back(1);
 	PLC_DATA.OPC_TAGNAME.push_back("D4138");
 	//實際8
-
-	logger.information("載入PLC點位資料[%s]完成, 總共 %z個點位", fileName, PLC_DATA.MultipleAreaReads.size());
 }
 
 void PLC::LoadAlarm(std::string fileName)

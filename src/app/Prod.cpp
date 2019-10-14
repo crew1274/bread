@@ -70,8 +70,6 @@ BreakPoint(false), isFine(true), isStart(false), counter(0)
 	PPRstatus = plc->ReadPoint_PLC("WW", 501, 0, false);
 	logger.information("PPR起始狀態為: %d", PPRstatus);
 	ActiveDetect = false;
-	Object p;
-	theEvent(this, p);
 }
 
 Prod::~Prod()

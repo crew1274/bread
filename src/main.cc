@@ -741,7 +741,7 @@ protected:
 		nc = new NotificationCenter();
 		//啟動RFID
 		logger.information("RFID Hardware: %s", config().getString("DEVICE.RFID", UART_PL3));
-		RFID = new Rfid_ds(config().getString("DEVICE.RFID", UART_PL3).c_str());
+		RFID = new Rfid_ds(config().getString("DEVICE.RFID").c_str());
 		network = new Network(&(config()));
 		//連結資料庫
 		mb = new MESBridge();
@@ -750,11 +750,12 @@ protected:
 		lb = new LocalBridge(&(config()));
 		plc = new PLC(config().getString("PLC.ID"), &(config()), nc);
 		plc->Connect(config().getString("PLC.IP").c_str(), 9600, "eth0", PROTOCOLTYPE_TCP);
-//		plc->Load("");
+		plc->Load();
 //		plc->LoadAlarm(config().getString("PLC.ALARM_FILE"));
-		ppr = new PPRDEVICE("/dev/ttyUL4", 1);
+		ppr = new PPRDEVICE(config().getString("DEVICE.PPR").c_str(), 1);
 		ws = NULL;
 		prod = new Prod(&(config()), RFID, mb, myb, rb, lb, ppr, plc, ws);
+		/*加入監聽事件*/
 		nc->addObserver(Observer<MyBridge, AlarmNotification>(*myb, &MyBridge::handleAlarm));
 	}
 
@@ -804,18 +805,18 @@ protected:
 		Timer DatabaseTimer(0, 1800000);
 		if(config().getBool("PROGRAM.DATABASE", true))
 		{
-//			logger.information("啟動RFID內碼轉換表同步背景程式");
-//			DatabaseTimer.start(TimerCallback<MESBridge>(*mb, &MESBridge::RFIDCloneTimer));
+			logger.information("啟動RFID內碼轉換表同步背景程式");
+			DatabaseTimer.start(TimerCallback<MESBridge>(*mb, &MESBridge::RFIDCloneTimer));
 		}
 
 		Timer PLCTimer(0, 1000);
 		if(config().getBool("PROGRAM.PLC", true))
 		{
-//			logger.information("啟動PLC資料紀錄功能");
-//			PLCTimer.start(TimerCallback<PLC>(*plc, &PLC::Base));
+			logger.information("啟動PLC資料紀錄功能");
+			PLCTimer.start(TimerCallback<PLC>(*plc, &PLC::Base));
 		}
 		/* RFID觸發 流程 */
-//		RunnableAdapter<Prod> runnableReader(*prod, &Prod::Reader);
+		RunnableAdapter<Prod> runnableReader(*prod, &Prod::Reader);
 //		RunnableAdapter<Prod> runnableforPreMO(*prod, &Prod::forPreMO);
 //		RunnableAdapter<Prod> runnableforWaitEvent(*prod, &Prod::WaitEvent);
 		RunnableAdapter<Prod> runnableforPPRloop(*prod, &Prod::PPRloop);
@@ -823,15 +824,15 @@ protected:
 		ThreadPool::defaultPool().start(runnableforPPRloop);
 		ThreadPool::defaultPool().start(runnableforActiveResponse);
 
-		if(config().getBool("PROGRAM.READER", true))
+		if(config().getBool("PROGRAM.READER", false))
 		{
-//			logger.information("啟動RFID reader");
-//			ThreadPool::defaultPool().start(runnableReader);
+			logger.information("啟動RFID reader");
+			ThreadPool::defaultPool().start(runnableReader);
 //			ThreadPool::defaultPool().start(runnableforPreMO);
 //			ThreadPool::defaultPool().start(runnableforWaitEvent);
 		}
 		// set-up a server socket
-		ServerSocket svs(9999);
+		ServerSocket svs(config().getInt("DEVICE.PORT", 9999));
 		// set-up a HTTPServer instance
 		HTTPServer srv(new RequestHandlerFactory(prod), svs, new HTTPServerParams);
 		// start the HTTPServer

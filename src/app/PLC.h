@@ -74,7 +74,7 @@ class PLC: public OmronPLC //繼承 OmronPLC
 public:
 	PLC(std::string EngName, AutoPtr<AbstractConfiguration> _config, NotificationCenter *_nc);
 	virtual ~PLC();
-	void Load(std::string fileName);
+	void Load();
 	void LoadAlarm(std::string fileName);
 	void Base(Poco::Timer& timer);
 	bool WritePoint_PLC(std::string CS_mode, int address, int write_value, bool dec_as_hex, int bit_position = 0);
