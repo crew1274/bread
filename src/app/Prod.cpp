@@ -7,10 +7,9 @@
 
 #include <app/Prod.h>
 
-Prod::Prod(AutoPtr<AbstractConfiguration> _config, Rfid_ds* _RFID, MESBridge* _mb, MyBridge* _myb, RedisBridge* _rb, LocalBridge* _lb, PPRDEVICE* _ppr, PLC* _plc, WebSocket* _ws):
+Prod::Prod(AutoPtr<AbstractConfiguration> _config, Rfid_ds* _RFID, MESBridge* _mb, MyBridge* _myb, RedisBridge* _rb, LocalBridge* _lb, PLC* _plc, WebSocket* _ws):
 logger(Logger::get("Production")), config(_config), RFID(_RFID),
-mb(_mb), myb(_myb), rb(_rb), lb(_lb),
-ppr(_ppr), plc(_plc), ws(_ws),
+mb(_mb), myb(_myb), rb(_rb), lb(_lb), plc(_plc), ws(_ws),
 BreakPoint(false), isFine(true), isStart(false), counter(0)
 {
 	// TODO Auto-generated constructor stub
@@ -70,6 +69,8 @@ BreakPoint(false), isFine(true), isStart(false), counter(0)
 	PPRstatus = plc->ReadPoint_PLC("WW", 501, 0, false);
 	logger.information("PPR起始狀態為: %d", PPRstatus);
 	ActiveDetect = false;
+	ppr_1 = new PPRDEVICE(config->getString("DEVICE.PPR").c_str(), 1);
+	ppr_2 = new PPRDEVICE(config->getString("DEVICE.PPR").c_str(), 2);
 }
 
 Prod::~Prod()
@@ -1394,9 +1395,25 @@ void Prod::PPRloop()
 
 bool Prod::StopPPR()
 {
-//	ppr->operation_start(false);
+	if(config->getBool("DEVICE.ENV"))
+	{
+		ppr_1->operation_start(false);
+		ppr_2->operation_start(false);
+	}
 	logger.information("關閉PPR成功:");
 	return true;
+}
+
+void Prod::BackgroundPPR()
+{
+	while(1)
+	{
+		plc->WritePoint_PLC("WW", 502, ppr_1->actual_average_current(), false);
+		plc->WritePoint_PLC("WW", 504, ppr_1->actual_average_voltage(), false);
+		plc->WritePoint_PLC("WW", 505, ppr_2->actual_average_current(), false);
+		plc->WritePoint_PLC("WW", 506, ppr_2->actual_average_voltage(), false);
+		Thread::sleep(1000);
+	}
 }
 
 bool Prod::startPPR(int index)
@@ -1431,9 +1448,14 @@ bool Prod::startPPR(int index)
 		}
 		std::vector<PPR_Waveform_Table> ppr_recipe;
 		ppr_recipe.push_back(tempTable);
-		ppr->waveform_set(100, ppr_recipe);
-		ppr->operation_start(true);
-		logger.information("啟動PPR成功:");
+		ppr_1->waveform_set(100, ppr_recipe);
+		ppr_2->waveform_set(100, ppr_recipe);
+		if(config->getBool("DEVICE.ENV"))
+		{
+			ppr_1->operation_start(true);
+			ppr_2->operation_start(true);
+		}
+		logger.information("啟動PPR成功");
 		return true;
 	}
     catch (Exception &e)
@@ -1498,34 +1520,24 @@ bool Prod::ReadyProd(JSON::Object::Ptr data)
 		}
 
 		/*舊有參數*/
-		float RD05M47 = 0; /*板寬*/
-		float RD05M48 = 0; /*板寬*/
 		std::string erpname = "";
 		JSON::Object::Ptr ppr_data = data->getObject("ppr_data");
 		JSON::Array::Ptr procpram = data->getObject("procdata")->getObject("procprams")->getArray("procpram");
-		for(uint i=0; i<procpram->size(); i++)
-		{
-			erpname = procpram->getObject(i)->get("procprammes").convert<std::string>();
-			if(erpname == "RD05M48")
-			{
-				RD05M48 = procpram->getObject(i)->get("procvalue").convert<float>();
-				logger.information("版寬: %hf", RD05M48);
-			}
-			else if(erpname == "RD05M47")
-			{
-				RD05M47 = procpram->getObject(i)->get("procvalue").convert<float>();
-				logger.information("版高: %hf", RD05M47);
-			}
-		}
-		int pnl = ppr_data->get("PlatingPnl").convert<int>() + 2;
-		plc->WritePoint_PLC("EM_3", 30000, pnl, true);	//運轉靶數
-		plc->WritePoint_PLC("EM_3", 30000, pnl-2, true);	//運轉靶數(扣除dummy)
+		float RD05M47 = ppr_data->get("RD05M47").convert<float>();//長
+		logger.information("版高: %hf", RD05M47);
+		float RD05M48 = ppr_data->get("RD05M48").convert<float>();//寬
+		logger.information("版寬: %hf", RD05M48);
+		int pnl = ppr_data->get("PlatingPnl").convert<int>();
+		logger.information("運轉靶數(扣除dummy): %d", pnl);
+		plc->WritePoint_PLC("EM_3", 30010, 0, true);	//末端 固定給0
+		plc->WritePoint_PLC("EM_3", 30011, 0, true);	//末端 固定給0
+		plc->WritePoint_PLC("EM_3", 30012, 0, true);	//末端 固定給0
+		plc->WritePoint_PLC("EM_3", 30013, pnl, true);	//運轉靶數(扣除dummy)
 		plc->WritePoint_PLC("EM_3", 30009, total_time, true);	//電鍍時間(min)
 		plc->WritePoint_PLC("EM_3", 30015, (total_time*60)/10000, true);	//寫入電鍍時間 HighBit
 		plc->WritePoint_PLC("EM_3", 30014, (total_time*60)%10000, true);	//寫入電鍍時間 LowBit
 		plc->WritePoint_PLC("EM_3", 30016, static_cast<int>(RD05M47), true); //寫入遮板位置
 		plc->WritePoint_PLC("EM_3", 30019, rand() % 3000 + 1, true); //寫入隨機亂數
-		plc->WritePoint_PLC("EM_3", 30000, pnl, true);	//運轉靶數
 		std::list<int> DistanceList = ConvertDistance(pnl, static_cast<int>(RD05M48), true);
 		for(int i=0; i<8; i++)	//寫入推桿位置
 		{
@@ -1540,7 +1552,7 @@ bool Prod::ReadyProd(JSON::Object::Ptr data)
 				plc->WritePoint_PLC("EM_3", 30001+i, 0, true);
 			}
 		}
-		return true;
+		return plc->OverWrite("EM_3", 11900, 0, 30000, 31000, pnl + 2, true) and plc->OverWrite("EM_3", 11999, 0, 30099, 31099, 1, false);
 	}
     catch (Exception &e)
     {
@@ -1549,13 +1561,7 @@ bool Prod::ReadyProd(JSON::Object::Ptr data)
     return false;
 }
 
-bool Prod::doProd()
-{
-	int TotalPnl = plc->ReadPoint_PLC("EM_3", 30000, 0, true);
-	return plc->OverWrite("EM_3", 11900, 0, 30000, 31000, TotalPnl, true);
-}
-
 bool Prod::confirmProd()
 {
-	return plc->OverWrite("EM_3", 11999, 0, 30099, 31099, 1, false);
+	return plc->WritePoint_PLC("H", 0, 256, false, 0);
 }

@@ -169,40 +169,29 @@ void ApiHandler::handleRequest(HTTPServerRequest& request, HTTPServerResponse& r
 			}
 			MainObject.set("response", true);
 		}
+		else if(PathSegments[1] == "prod")
+		{
+			if(PathSegments[2] == "check" && request.getMethod() == HTTPRequest::HTTP_GET)
+			{
+				MainObject.set("check", ProdCheck());
+			}
+		}
 		else if(PathSegments[1] == "PLC")
 		{
-			if(PathSegments[2] == "temp") //暫存區
+			if(PathSegments[2] == "temp" && request.getMethod() == HTTPRequest::HTTP_POST) //寫入參數
 			{
-				if(request.getMethod() == HTTPRequest::HTTP_POST)	// 寫入資料
+				ReciveObject = parser.parse(s).extract<Object::Ptr>();
+				if( 	ReciveObject->has("ppr_result") and ReciveObject->has("ppr_data")
+					and ReciveObject->has("lotdata") and ReciveObject->has("procdata") )
 				{
-					ReciveObject = parser.parse(s).extract<Object::Ptr>();
-					if( 	ReciveObject->has("ppr_result") and ReciveObject->has("ppr_data")
-						and ReciveObject->has("lotdata") and ReciveObject->has("procdata") )
-					{
-						logger.information("請求寫入暫存區");
-						MainObject.set("response", prod->ReadyProd(ReciveObject));
-					}
+					logger.information("請求寫入暫存區");
+					MainObject.set("response", prod->ReadyProd(ReciveObject));
 				}
-				else if(request.getMethod() == HTTPRequest::HTTP_GET) // 取得資料
-				{
-					logger.information("要求暫存區資料");
-				}
+
 			}
-			else if(PathSegments[2] == "work")	//工作區
+			else if(PathSegments[2] == "prod" && request.getMethod() == HTTPRequest::HTTP_POST)	//啟動自動模式
 			{
-				if(request.getMethod() == HTTPRequest::HTTP_POST)	// 寫入資料
-				{
-					logger.information("請求寫入工作區");
-					MainObject.set("response", prod->doProd());
-				}
-				else if(request.getMethod() == HTTPRequest::HTTP_GET) // 取得資料
-				{
-					logger.information("請求工作區資料");
-				}
-			}
-			else if(PathSegments[2] == "prod" && request.getMethod() == HTTPRequest::HTTP_POST)	//工作區
-			{
-				logger.information("請求生產");
+				logger.information("啟動自動模式");
 				MainObject.set("response", prod->confirmProd());
 			}
 		}

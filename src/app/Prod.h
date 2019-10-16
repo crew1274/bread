@@ -182,7 +182,7 @@ class Prod
 {
 public:
 	Prod(AutoPtr<AbstractConfiguration> _config, Rfid_ds* _RFID, MESBridge* _mb, MyBridge* _myb, RedisBridge* _rb,
-			LocalBridge* _lb, PPRDEVICE* _ppr, PLC* _plc, WebSocket* _ws);
+			LocalBridge* _lb, PLC* _plc, WebSocket* _ws);
 	~Prod();
 	void ClearEvent();
 	void WaitEvent();
@@ -212,10 +212,10 @@ public:
 	void forPPR();
 	bool StopPPR();
 	void PPRloop();
+	void BackgroundPPR();
 	bool startPPR(int index);
 	void ActiveResponse();
 	bool ReadyProd(JSON::Object::Ptr data);
-	bool doProd();
 	bool confirmProd();
 
 	struct work_point
@@ -235,7 +235,8 @@ public:
 	MyBridge* myb;
 	RedisBridge* rb;
 	LocalBridge* lb;
-	PPRDEVICE* ppr;
+	PPRDEVICE* ppr_1;
+	PPRDEVICE* ppr_2;
 	PLC* plc;
 	WebSocket* ws;
 	BasicEvent<JSON::Object> theEvent;

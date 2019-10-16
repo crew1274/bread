@@ -438,7 +438,7 @@ int PPRDEVICE::waveform_set(int regulator, std::vector<PPR_Waveform_Table> PPR_T
 
 	}
 
-	for (uint ii = PPR_Table.size(); ii < 16; ii++)
+	for (uint ii = PPR_Table.size(); ii < PPR_Table.size()+1; ii++)
 	{
 		if(modbus::modbus_write_register(ii*7 + 2, 0)==false){
 			cout << "waveform_set (modbus error)" << endl;
@@ -500,31 +500,31 @@ int PPRDEVICE::actual_counter_value(){
 		cout << "actual_counter_value (modbus error)" << endl;
 		return 65535;
 	}
-	cout << " actual_counter_value " << ((buffer[0]<<16)+buffer[1]) << endl;
+//	cout << " actual_counter_value " << ((buffer[0]<<16)+buffer[1]) << endl;
 	return int((buffer[0]<<16)+buffer[1]) ;
 }
 
-int PPRDEVICE::actual_average_current(){
-
+int PPRDEVICE::actual_average_current()
+{
 	uint16_t buffer[1];
 	memset(buffer,0,sizeof(buffer));
 	if(modbus::modbus_read_input_registers(3, 1, buffer)==false){
 		cout << "actual_average_current (modbus error)" << endl;
 		return 65535;
 	}
-	cout << " actual_average_current " << (buffer[0]) << endl;
+	cout << "actual_average_current: " << buffer[0] << endl;
 	return int(buffer[0]) ;
 }
 
-int PPRDEVICE::actual_average_voltage(){
-
+int PPRDEVICE::actual_average_voltage()
+{
 	uint16_t buffer[1];
 	memset(buffer,0,sizeof(buffer));
 	if(modbus::modbus_read_input_registers(4, 1, buffer)==false){
 		cout << "actual_average_voltage (modbus error)" << endl;
 		return 65535;
 	}
-	cout << " actual_average_voltage " << (buffer[0]) << endl;
+	cout << "actual_average_voltage: " << buffer[0] << endl;
 	return int(buffer[0]) ;
 }
 

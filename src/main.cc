@@ -151,7 +151,7 @@ using namespace Poco::JSON;
 using namespace Poco::Util;
 using namespace Poco::Net;
 
-#if 1
+#if 0
 class ApiRequestHandler: public HTTPRequestHandler
 {
 public:
@@ -593,7 +593,7 @@ private:
 	Logger& logger;
 	Prod* prod;
 };
-
+#endif
 class RequestHandlerFactory: public HTTPRequestHandlerFactory
 {
 public:
@@ -752,9 +752,8 @@ protected:
 		plc->Connect(config().getString("PLC.IP").c_str(), 9600, "eth0", PROTOCOLTYPE_TCP);
 		plc->Load();
 //		plc->LoadAlarm(config().getString("PLC.ALARM_FILE"));
-		ppr = new PPRDEVICE(config().getString("DEVICE.PPR").c_str(), 1);
 		ws = NULL;
-		prod = new Prod(&(config()), RFID, mb, myb, rb, lb, ppr, plc, ws);
+		prod = new Prod(&(config()), RFID, mb, myb, rb, lb, plc, ws);
 		/*加入監聽事件*/
 		nc->addObserver(Observer<MyBridge, AlarmNotification>(*myb, &MyBridge::handleAlarm));
 	}
@@ -820,10 +819,11 @@ protected:
 //		RunnableAdapter<Prod> runnableforPreMO(*prod, &Prod::forPreMO);
 //		RunnableAdapter<Prod> runnableforWaitEvent(*prod, &Prod::WaitEvent);
 		RunnableAdapter<Prod> runnableforPPRloop(*prod, &Prod::PPRloop);
+		RunnableAdapter<Prod> runnableforBackgroundPPR(*prod, &Prod::BackgroundPPR);
 		RunnableAdapter<Prod> runnableforActiveResponse(*prod, &Prod::ActiveResponse);
 		ThreadPool::defaultPool().start(runnableforPPRloop);
 		ThreadPool::defaultPool().start(runnableforActiveResponse);
-
+		ThreadPool::defaultPool().start(runnableforBackgroundPPR);
 		if(config().getBool("PROGRAM.READER", false))
 		{
 			logger.information("啟動RFID reader");
@@ -860,4 +860,3 @@ private:
 };
 
 POCO_SERVER_MAIN(VCP30)
-#endif
