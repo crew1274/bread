@@ -181,8 +181,7 @@ void ApiHandler::handleRequest(HTTPServerRequest& request, HTTPServerResponse& r
 			if(PathSegments[2] == "temp" && request.getMethod() == HTTPRequest::HTTP_POST) //寫入參數
 			{
 				ReciveObject = parser.parse(s).extract<Object::Ptr>();
-				if( 	ReciveObject->has("ppr_result") and ReciveObject->has("ppr_data")
-					and ReciveObject->has("lotdata") and ReciveObject->has("procdata") )
+				if(ReciveObject->has("ppr_result") and ReciveObject->has("ppr_data"))
 				{
 					logger.information("請求寫入暫存區");
 					MainObject.set("response", prod->ReadyProd(ReciveObject));
@@ -198,7 +197,20 @@ void ApiHandler::handleRequest(HTTPServerRequest& request, HTTPServerResponse& r
 		else if(PathSegments[1] == "CallAGV")
 		{
 			logger.information("呼叫AGV");
-			MainObject.set("response", prod->CallAGV());
+			if(prod->config->getBool("DEVICE.ENV"))
+			{
+				MainObject.set("response", prod->CallAGV());
+			}
+			else
+			{
+				MainObject.set("response", true);
+			}
+		}
+		else if(PathSegments[1] == "RFID" && request.getMethod() == HTTPRequest::HTTP_GET)
+		{
+			Object inner;
+			inner.set("Operator", "171104");
+			prod->theEvent(this, inner);
 		}
 		else if(PathSegments[1] == "RFID" && request.getMethod() == HTTPRequest::HTTP_POST)
 		{
@@ -215,19 +227,15 @@ void ApiHandler::handleRequest(HTTPServerRequest& request, HTTPServerResponse& r
 				{
 					target = prod->mb->GotTargetNo(payload);
 					logger.information("RFID Reader API偵測到人員卡: %s", target);
-					inner.set("MSG", "RFID Reader API偵測到人員卡:"+ target);
-					inner.set("toast", "RFID Reader API偵測到人員卡:"+ target);
 					inner.set("Operator", target);
-					prod->wsSend(inner, oss);
+					prod->theEvent(this, inner);
 				}
 				else if(tail == "d4" || tail == "D4")
 				{
 					target = prod->mb->GotTargetNo(payload);
 					logger.information("RFID Reader API偵測到工單: %s", target);
-					inner.set("MSG", "RFID Reader API偵測到工單:"+ target);
-					inner.set("toast", "RFID Reader API偵測到工單:"+ target);
 					inner.set("LotNO", target);
-					prod->wsSend(inner, oss);
+					prod->theEvent(this, inner);
 				}
 			}
 		}

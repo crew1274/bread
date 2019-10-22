@@ -5,7 +5,7 @@
  *      Author: 170302
  */
 
-#include "modbustcp.h"
+#include "hal/modbustcp_slaveid.h"
 
 
 /**
@@ -127,14 +127,14 @@ void modbus::modbus_close() {
  * @param address   Reference Address
  * @param func      Modbus Functional Code
  */
-void modbus::modbus_build_request(uint8_t *to_send, int address, int func) {
+void modbus::modbus_build_request(int slave_id,uint8_t *to_send, int address, int func) {
 	if(_mode == _mode_modbus_tcp){
 		to_send[0] = (uint8_t) _msg_id >> 8;
 		to_send[1] = (uint8_t) (_msg_id & 0x00FF);
 		to_send[2] = 0;
 		to_send[3] = 0;
 		to_send[4] = 0;
-		to_send[6] = (uint8_t) _slaveid;
+		to_send[6] = (uint8_t) slave_id;
 		to_send[7] = (uint8_t) func;
 		to_send[8] = (uint8_t) (address >> 8);
 		to_send[9] = (uint8_t) (address & 0x00FF);
@@ -144,7 +144,7 @@ void modbus::modbus_build_request(uint8_t *to_send, int address, int func) {
 //		to_send[2] = 0;
 //		to_send[3] = 0;
 //		to_send[4] = 0;
-		to_send[0] = (uint8_t) _slaveid;
+		to_send[0] = (uint8_t) slave_id;
 		to_send[1] = (uint8_t) func;
 		to_send[2] = (uint8_t) (address >> 8);
 		to_send[3] = (uint8_t) (address & 0x00FF);
@@ -161,18 +161,18 @@ void modbus::modbus_build_request(uint8_t *to_send, int address, int func) {
  * @param func      Modbus Functional Code
  * @param value     Data to Be Written
  */
-void modbus::modbus_write(int address, int amount, int func, uint16_t *value) {
+void modbus::modbus_write(int slave_id,int address, int amount, int func, uint16_t *value) {
 	if(_mode == _mode_modbus_tcp){
 		if(func == WRITE_COIL || func == WRITE_REG) {
 			uint8_t to_send[12];
-			modbus_build_request(to_send, address, func);
+			modbus_build_request(slave_id,to_send, address, func);
 			to_send[5] = 6;
 			to_send[10] = (uint8_t) (value[0] >> 8);
 			to_send[11] = (uint8_t) (value[0] & 0x00FF);
-			modbus_send(to_send, 12);
+			modbus_send(slave_id,to_send, 12);
 		} else if(func == WRITE_REGS){
 			uint8_t to_send[13 + 2 * amount];
-			modbus_build_request(to_send, address, func);
+			modbus_build_request(slave_id,to_send, address, func);
 			to_send[5] = (uint8_t) (5 + 2 * amount);
 			to_send[10] = (uint8_t) (amount >> 8);
 			to_send[11] = (uint8_t) (amount & 0x00FF);
@@ -181,10 +181,10 @@ void modbus::modbus_write(int address, int amount, int func, uint16_t *value) {
 				to_send[13 + 2 * i] = (uint8_t) (value[i] >> 8);
 				to_send[14 + 2 * i] = (uint8_t) (value[i] & 0x00FF);
 			}
-			modbus_send(to_send, 13 + 2 * amount);
+			modbus_send(slave_id,to_send, 13 + 2 * amount);
 		} else if(func == WRITE_COILS) {
 			uint8_t to_send[14 + (amount -1) / 8 ];
-			modbus_build_request(to_send, address, func);
+			modbus_build_request(slave_id,to_send, address, func);
 			to_send[5] = (uint8_t) (7 + (amount -1) / 8);
 			to_send[10] = (uint8_t) (amount >> 8);
 			to_send[11] = (uint8_t) (amount >> 8);
@@ -192,19 +192,19 @@ void modbus::modbus_write(int address, int amount, int func, uint16_t *value) {
 			for(int i = 0; i < amount; i++) {
 				to_send[13 + (i - 1) / 8] += (uint8_t) (value[i] << (i % 8));
 			}
-			modbus_send(to_send, 14 + (amount - 1) / 8);
+			modbus_send(slave_id,to_send, 14 + (amount - 1) / 8);
 		}
 	}else if(_mode == _mode_modbus_rtu){
 		if(func == WRITE_COIL || func == WRITE_REG) {
 			uint8_t to_send[6]; // 12
-			modbus_build_request(to_send, address, func);
+			modbus_build_request(slave_id,to_send, address, func);
 //			to_send[5] = 6;
 			to_send[4] = (uint8_t) (value[0] >> 8);
 			to_send[5] = (uint8_t) (value[0] & 0x00FF);
-			modbus_send(to_send, 6);
+			modbus_send(slave_id,to_send, 6);
 		} else if(func == WRITE_REGS){
 			uint8_t to_send[7 + 2 * amount];
-			modbus_build_request(to_send, address, func);
+			modbus_build_request(slave_id,to_send, address, func);
 //			to_send[5] = (uint8_t) (5 + 2 * amount);
 			to_send[4] = (uint8_t) (amount >> 8);
 			to_send[5] = (uint8_t) (amount & 0x00FF);
@@ -213,10 +213,10 @@ void modbus::modbus_write(int address, int amount, int func, uint16_t *value) {
 				to_send[7 + 2 * i] = (uint8_t) (value[i] >> 8);
 				to_send[8 + 2 * i] = (uint8_t) (value[i] & 0x00FF);
 			}
-			modbus_send(to_send, 7 + 2 * amount);
+			modbus_send(slave_id,to_send, 7 + 2 * amount);
 		} else if(func == WRITE_COILS) {
 			uint8_t to_send[8 + (amount -1) / 8 ];
-			modbus_build_request(to_send, address, func);
+			modbus_build_request(slave_id,to_send, address, func);
 //			to_send[5] = (uint8_t) (7 + (amount -1) / 8);
 			to_send[4] = (uint8_t) (amount >> 8);
 			to_send[5] = (uint8_t) (amount >> 8);
@@ -224,7 +224,7 @@ void modbus::modbus_write(int address, int amount, int func, uint16_t *value) {
 			for(int i = 0; i < amount; i++) {
 				to_send[7 + (i - 1) / 8] += (uint8_t) (value[i] << (i % 8));
 			}
-			modbus_send(to_send, 8 + (amount - 1) / 8);
+			modbus_send(slave_id, to_send, 8 + (amount - 1) / 8);
 		}
 	}else{
 		cout << "mode error !" << endl ;
@@ -238,21 +238,21 @@ void modbus::modbus_write(int address, int amount, int func, uint16_t *value) {
  * @param amount    Amount of Data to Read
  * @param func      Modbus Functional Code
  */
-void modbus::modbus_read(int address, int amount, int func){
+void modbus::modbus_read(int slave_id,int address, int amount, int func){
 	if(_mode == _mode_modbus_tcp){
 		uint8_t to_send[12];
-		modbus_build_request(to_send, address, func);
+		modbus_build_request(slave_id,to_send, address, func);
 		to_send[5] = 6;
 		to_send[10] = (uint8_t) (amount >> 8);
 		to_send[11] = (uint8_t) (amount & 0x00FF);
-		modbus_send(to_send, 12);
+		modbus_send(slave_id,to_send, 12);
 	}else if(_mode == _mode_modbus_rtu){
 		uint8_t to_send[6];
-		modbus_build_request(to_send, address, func);
+		modbus_build_request(slave_id,to_send, address, func);
 //		to_send[5] = 6;
 		to_send[4] = (uint8_t) (amount >> 8);
 		to_send[5] = (uint8_t) (amount & 0x00FF);
-		modbus_send(to_send, 6);
+		modbus_send(slave_id,to_send, 6);
 	}else{
 		cout << "mode error !" << endl ;
 	}
@@ -266,15 +266,15 @@ void modbus::modbus_read(int address, int amount, int func){
  * @param amount     Amount of Registers to Read
  * @param buffer     Buffer to Store Data Read from Registers
  */
-bool modbus::modbus_read_holding_registers(int address, int amount, uint16_t *buffer) {
+bool modbus::modbus_read_holding_registers(int slave_id,int address, int amount, uint16_t *buffer) {
 	if(_mode == _mode_modbus_tcp){
 		if(_connected) {
 			if(amount > 65535 || address > 65535) {
 				return false;
 			}
-			modbus_read(address, amount, READ_REGS);
+			modbus_read(slave_id, address, amount, READ_REGS);
 			uint8_t to_rec[MAX_MSG_LENGTH];
-			ssize_t k = modbus_receive(to_rec);
+			ssize_t k = modbus_receive(slave_id, to_rec);
 			try {
 				modbus_error_handle(to_rec, READ_REGS);
 				for(int i = 0; i < amount; i++) {
@@ -293,9 +293,9 @@ bool modbus::modbus_read_holding_registers(int address, int amount, uint16_t *bu
 			if(amount > 65535 || address > 65535) {
 				return false;
 			}
-			modbus_read(address, amount, READ_REGS);
+			modbus_read(slave_id, address, amount, READ_REGS);
 			uint8_t to_rec[MAX_MSG_LENGTH];
-			ssize_t k = modbus_receive(to_rec);
+			ssize_t k = modbus_receive(slave_id, to_rec);
 			try {
 				modbus_error_handle(to_rec, READ_REGS);
 				for(int i = 0; i < amount; i++) {
@@ -311,7 +311,9 @@ bool modbus::modbus_read_holding_registers(int address, int amount, uint16_t *bu
 //		}
 	}else{
 		cout << "mode error !" << endl ;
+		return false;
 	}
+	return true;
 }
 
 
@@ -322,15 +324,15 @@ bool modbus::modbus_read_holding_registers(int address, int amount, uint16_t *bu
  * @param amount      Amount of Registers to Read
  * @param buffer      Buffer to Store Data Read from Registers
  */
-bool modbus::modbus_read_input_registers(int address, int amount, uint16_t *buffer) {
+bool modbus::modbus_read_input_registers(int slave_id, int address, int amount, uint16_t *buffer) {
 	if(_mode == _mode_modbus_tcp){
 		if(_connected){
 			if(amount > 65535 || address > 65535) {
 				return false;
 			}
-			modbus_read(address, amount, READ_INPUT_REGS);
+			modbus_read(slave_id, address, amount, READ_INPUT_REGS);
 			uint8_t to_rec[MAX_MSG_LENGTH];
-			ssize_t k = modbus_receive(to_rec);
+			ssize_t k = modbus_receive(slave_id, to_rec);
 			try {
 				modbus_error_handle(to_rec, READ_INPUT_REGS);
 				for(int i = 0; i < amount; i++) {
@@ -349,9 +351,9 @@ bool modbus::modbus_read_input_registers(int address, int amount, uint16_t *buff
 			if(amount > 65535 || address > 65535) {
 				return false;
 			}
-			modbus_read(address, amount, READ_INPUT_REGS);
+			modbus_read(slave_id, address, amount, READ_INPUT_REGS);
 			uint8_t to_rec[MAX_MSG_LENGTH];
-			ssize_t k = modbus_receive(to_rec);
+			ssize_t k = modbus_receive(slave_id, to_rec);
 			try {
 				modbus_error_handle(to_rec, READ_INPUT_REGS);
 				for(int i = 0; i < amount; i++) {
@@ -367,7 +369,9 @@ bool modbus::modbus_read_input_registers(int address, int amount, uint16_t *buff
 //		}
 	}else{
 		cout << "mode error !" << endl ;
+		return false;
 	}
+	return true;
 }
 
 
@@ -378,15 +382,15 @@ bool modbus::modbus_read_input_registers(int address, int amount, uint16_t *buff
  * @param amount      Amount of Coils to Read
  * @param buffer      Buffer to Store Data Read from Coils
  */
-bool modbus::modbus_read_coils(int address, int amount, bool *buffer) {
+bool modbus::modbus_read_coils(int slave_id, int address, int amount, bool *buffer) {
 	if(_mode == _mode_modbus_tcp){
 		if(_connected) {
 			if(amount > 2040 || address > 65535) {
 				return false;
 			}
-			modbus_read(address, amount, READ_COILS);
+			modbus_read(slave_id, address, amount, READ_COILS);
 			uint8_t to_rec[MAX_MSG_LENGTH];
-			ssize_t k = modbus_receive(to_rec);
+			ssize_t k = modbus_receive(slave_id, to_rec);
 			try {
 				modbus_error_handle(to_rec, READ_COILS);
 				for(int i = 0; i < amount; i++) {
@@ -405,9 +409,9 @@ bool modbus::modbus_read_coils(int address, int amount, bool *buffer) {
 			if(amount > 2040 || address > 65535) {
 				return false;
 			}
-			modbus_read(address, amount, READ_COILS);
+			modbus_read(slave_id, address, amount, READ_COILS);
 			uint8_t to_rec[MAX_MSG_LENGTH];
-			ssize_t k = modbus_receive(to_rec);
+			ssize_t k = modbus_receive(slave_id, to_rec);
 			try {
 				modbus_error_handle(to_rec, READ_COILS);
 				for(int i = 0; i < amount; i++) {
@@ -422,7 +426,9 @@ bool modbus::modbus_read_coils(int address, int amount, bool *buffer) {
 //		}
 	}else{
 		cout << "modbus_read_coils mode error !" << endl ;
+		return false;
 	}
+	return true;
 }
 
 
@@ -433,15 +439,15 @@ bool modbus::modbus_read_coils(int address, int amount, bool *buffer) {
  * @param amount    Amount of Bits to Read
  * @param buffer    Buffer to store Data Read from Input Bits
  */
-bool modbus::modbus_read_input_bits(int address, int amount, bool* buffer) {
+bool modbus::modbus_read_input_bits(int slave_id, int address, int amount, bool* buffer) {
 	if(_mode == _mode_modbus_tcp){
 		if(_connected) {
 			if(amount > 2040 || address > 65535) {
 				return false;
 			}
-			modbus_read(address, amount, READ_INPUT_BITS);
+			modbus_read(slave_id, address, amount, READ_INPUT_BITS);
 			uint8_t to_rec[MAX_MSG_LENGTH];
-			ssize_t k = modbus_receive(to_rec);
+			ssize_t k = modbus_receive(slave_id, to_rec);
 			try {
 				modbus_error_handle(to_rec, READ_INPUT_BITS);
 				for(int i = 0; i < amount; i++) {
@@ -459,9 +465,9 @@ bool modbus::modbus_read_input_bits(int address, int amount, bool* buffer) {
 			if(amount > 2040 || address > 65535) {
 				return false;
 			}
-			modbus_read(address, amount, READ_INPUT_BITS);
+			modbus_read(slave_id, address, amount, READ_INPUT_BITS);
 			uint8_t to_rec[MAX_MSG_LENGTH];
-			ssize_t k = modbus_receive(to_rec);
+			ssize_t k = modbus_receive(slave_id, to_rec);
 			try {
 				modbus_error_handle(to_rec, READ_INPUT_BITS);
 				for(int i = 0; i < amount; i++) {
@@ -476,7 +482,9 @@ bool modbus::modbus_read_input_bits(int address, int amount, bool* buffer) {
 //		}
 	}else{
 		cout << "modbus_read_input_bits mode error !" << endl ;
+		return false;
 	}
+	return true;
 }
 
 
@@ -486,16 +494,16 @@ bool modbus::modbus_read_input_bits(int address, int amount, bool* buffer) {
  * @param address    Reference Address
  * @param to_write   Value to be Written to Coil
  */
-bool modbus::modbus_write_coil(int address, bool to_write) {
+bool modbus::modbus_write_coil(int slave_id, int address, bool to_write) {
 	if(_mode == _mode_modbus_tcp){
 		if(_connected) {
 			if(address > 65535) {
 				return false;
 			}
 			int value = to_write * 0xFF00;
-			modbus_write(address, 1, WRITE_COIL, (uint16_t *)&value);
+			modbus_write(slave_id, address, 1, WRITE_COIL, (uint16_t *)&value);
 			uint8_t to_rec[MAX_MSG_LENGTH];
-			ssize_t k = modbus_receive(to_rec);
+			ssize_t k = modbus_receive(slave_id, to_rec);
 			try{
 				modbus_error_handle(to_rec, WRITE_COIL);
 			} catch (exception &e) {
@@ -511,9 +519,9 @@ bool modbus::modbus_write_coil(int address, bool to_write) {
 				return false;
 			}
 			int value = to_write * 0xFF00;
-			modbus_write(address, 1, WRITE_COIL, (uint16_t *)&value);
+			modbus_write(slave_id, address, 1, WRITE_COIL, (uint16_t *)&value);
 			uint8_t to_rec[MAX_MSG_LENGTH];
-			ssize_t k = modbus_receive(to_rec);
+			ssize_t k = modbus_receive(slave_id, to_rec);
 			try{
 				modbus_error_handle(to_rec, WRITE_COIL);
 			} catch (exception &e) {
@@ -525,7 +533,9 @@ bool modbus::modbus_write_coil(int address, bool to_write) {
 //		}
 	}else{
 		cout << "mode error !" << endl ;
+		return false;
 	}
+	return true;
 }
 
 
@@ -535,17 +545,17 @@ bool modbus::modbus_write_coil(int address, bool to_write) {
  * @param address   Reference Address
  * @param value     Value to Be Written to Register
  */
-bool modbus::modbus_write_register(int address, uint16_t value) {
+bool modbus::modbus_write_register(int slave_id, int address, uint16_t value) {
 	if(_mode == _mode_modbus_tcp){
 		if(_connected) {
 			if(address > 65535) {
 				return false;
 			}
-			modbus_write(address, 1, WRITE_REG, &value);
+			modbus_write(slave_id, address, 1, WRITE_REG, &value);
 			uint8_t to_rec[MAX_MSG_LENGTH];
-			ssize_t k = modbus_receive(to_rec);
+			ssize_t k = modbus_receive(slave_id, to_rec);
 			try{
-				modbus_error_handle(to_rec, WRITE_COIL);
+				modbus_error_handle(to_rec, WRITE_REG);
 			} catch (exception &e) {
 				cout << e.what() << endl;
 				return false;
@@ -560,12 +570,12 @@ bool modbus::modbus_write_register(int address, uint16_t value) {
 		{
 			return false;
 		}
-		modbus_write(address, 1, WRITE_REG, &value);
+		modbus_write(slave_id, address, 1, WRITE_REG, &value);
 		uint8_t to_rec[MAX_MSG_LENGTH];
-		ssize_t k = modbus_receive(to_rec);
+		ssize_t k = modbus_receive(slave_id, to_rec);
 		try
 		{
-			modbus_error_handle(to_rec, WRITE_COIL);
+			modbus_error_handle(to_rec, WRITE_REG);
 		}
 		catch (exception &e)
 		{
@@ -576,6 +586,7 @@ bool modbus::modbus_write_register(int address, uint16_t value) {
 	else
 	{
 		cout << "mode error !" << endl ;
+		return false;
 	}
 	return true;
 }
@@ -588,7 +599,7 @@ bool modbus::modbus_write_register(int address, uint16_t value) {
  * @param amount   Amount of Coils to Write
  * @param value    Values to Be Written to Coils
  */
-bool modbus::modbus_write_coils(int address, int amount, bool *value) {
+bool modbus::modbus_write_coils(int slave_id, int address, int amount, bool *value) {
 	if(_mode == _mode_modbus_tcp){
 		if(_connected) {
 			if(address > 65535 || amount > 65535) {
@@ -598,9 +609,9 @@ bool modbus::modbus_write_coils(int address, int amount, bool *value) {
 			for(int i = 0; i < 4; i++) {
 				temp[i] = (uint16_t)value[i];
 			}
-			modbus_write(address, amount, WRITE_COILS,  temp);
+			modbus_write(slave_id, address, amount, WRITE_COILS,  temp);
 			uint8_t to_rec[MAX_MSG_LENGTH];
-			ssize_t k = modbus_receive(to_rec);
+			ssize_t k = modbus_receive(slave_id, to_rec);
 			try{
 				modbus_error_handle(to_rec, WRITE_COILS);
 			} catch (exception &e) {
@@ -619,9 +630,9 @@ bool modbus::modbus_write_coils(int address, int amount, bool *value) {
 			for(int i = 0; i < 4; i++) {
 				temp[i] = (uint16_t)value[i];
 			}
-			modbus_write(address, amount, WRITE_COILS,  temp);
+			modbus_write(slave_id, address, amount, WRITE_COILS,  temp);
 			uint8_t to_rec[MAX_MSG_LENGTH];
-			ssize_t k = modbus_receive(to_rec);
+			ssize_t k = modbus_receive(slave_id, to_rec);
 			try{
 				modbus_error_handle(to_rec, WRITE_COILS);
 			} catch (exception &e) {
@@ -633,7 +644,9 @@ bool modbus::modbus_write_coils(int address, int amount, bool *value) {
 //		}
 	}else{
 		cout << "mode error !" << endl ;
+		return false;
 	}
+	return true;
 
 }
 
@@ -645,15 +658,15 @@ bool modbus::modbus_write_coils(int address, int amount, bool *value) {
  * @param amount  Amount of Value to Write
  * @param value   Values to Be Written to the Registers
  */
-bool modbus::modbus_write_registers(int address, int amount, uint16_t *value) {
+bool modbus::modbus_write_registers(int slave_id, int address, int amount, uint16_t *value) {
 	if(_mode == _mode_modbus_tcp){
 		if(_connected) {
 			if(address > 65535 || amount > 65535) {
 				return false;
 			}
-			modbus_write(address, amount, WRITE_REGS, value);
+			modbus_write(slave_id, address, amount, WRITE_REGS, value);
 			uint8_t to_rec[MAX_MSG_LENGTH];
-			ssize_t k = modbus_receive(to_rec);
+			ssize_t k = modbus_receive(slave_id, to_rec);
 	//        for(int ii=0;ii<20;ii++)
 	//        	printf("[%d , %x]",ii,to_rec[ii]);
 
@@ -671,9 +684,9 @@ bool modbus::modbus_write_registers(int address, int amount, uint16_t *value) {
 			if(address > 65535 || amount > 65535) {
 				return false;
 			}
-			modbus_write(address, amount, WRITE_REGS, value);
+			modbus_write(slave_id, address, amount, WRITE_REGS, value);
 			uint8_t to_rec[MAX_MSG_LENGTH];
-			ssize_t k = modbus_receive(to_rec);
+			ssize_t k = modbus_receive(slave_id, to_rec);
 	//        for(int ii=0;ii<20;ii++)
 	//        	printf("[%d , %x]",ii,to_rec[ii]);
 
@@ -688,7 +701,9 @@ bool modbus::modbus_write_registers(int address, int amount, uint16_t *value) {
 //		}
 	}else{
 		cout << "mode error !" << endl ;
+		return false;
 	}
+	return true;
 }
 
 
@@ -698,7 +713,7 @@ bool modbus::modbus_write_registers(int address, int amount, uint16_t *value) {
  * @param length  Length of the Request
  * @return        Size of the request
  */
-ssize_t modbus::modbus_send(uint8_t *to_send, int length) {
+ssize_t modbus::modbus_send(int slave_id,uint8_t *to_send, int length) {
 
 	uint8_t Send_buffer[length +2];
 
@@ -727,7 +742,7 @@ ssize_t modbus::modbus_send(uint8_t *to_send, int length) {
  * @param buffer Buffer to Store the Data Retrieved
  * @return       Size of Incoming Data
  */
-ssize_t modbus::modbus_receive(uint8_t *buffer) {
+ssize_t modbus::modbus_receive(int slave_id, uint8_t *buffer) {
 
 	uint8_t Get_buffer[100];
 	int len_o = 100;

@@ -69,8 +69,7 @@ BreakPoint(false), isFine(true), isStart(false), counter(0)
 	PPRstatus = plc->ReadPoint_PLC("WW", 501, 0, false);
 	logger.information("PPR起始狀態為: %d", PPRstatus);
 	ActiveDetect = false;
-	ppr_1 = new PPRDEVICE(config->getString("DEVICE.PPR").c_str(), 1);
-	ppr_2 = new PPRDEVICE(config->getString("DEVICE.PPR").c_str(), 2);
+	ppr = new PPRDEVICE(config->getString("DEVICE.PPR").c_str());
 }
 
 Prod::~Prod()
@@ -1378,14 +1377,31 @@ void Prod::PPRloop()
 				//啟動PPR
 				if( i == 6)
 				{
-					StopPPR();
+					if(StopPPR())
+					{
+						//正常關閉
+						plc->WritePoint_PLC("WW", 501, i, false);
+					}
+					else
+					{
+						//關閉失敗
+						plc->WritePoint_PLC("WW", 501, 10, false);
+					}
 				}
 				else
 				{
 					//啟動PPR
-					startPPR(i-1);
+					if(startPPR(i-1))
+					{
+						//正常啟動
+						plc->WritePoint_PLC("WW", 501, i, false);
+					}
+					else
+					{
+						//啟動失敗
+						plc->WritePoint_PLC("WW", 501, 10, false);
+					}
 				}
-				plc->WritePoint_PLC("WW", 501, i, false);
 			}
 		}
 		PPRstatus = plc->ReadPoint_PLC("WW", 501, 0, false);
@@ -1395,24 +1411,68 @@ void Prod::PPRloop()
 
 bool Prod::StopPPR()
 {
-	if(config->getBool("DEVICE.ENV"))
+	try
 	{
-		ppr_1->operation_start(false);
-		ppr_2->operation_start(false);
+		if(config->getBool("DEVICE.ENV"))
+		{
+			bool result_1 = ppr->operation_start(1, false);
+			bool result_2 = ppr->operation_start(2, false);
+			if(result_1 != 0 || result_2 != 0)
+			{
+				logger.error("關閉PPR失敗");
+				return false;
+			}
+			else
+			{
+				logger.information("關閉PPR成功");
+				return true;
+			}
+		}
+		else
+		{
+			logger.information("關閉PPR成功");
+			return true;
+		}
 	}
-	logger.information("關閉PPR成功:");
-	return true;
+    catch (Exception &e)
+    {
+        logger.error(e.displayText());
+    }
+    StopPPR();
 }
 
 void Prod::BackgroundPPR()
 {
+	int value = 0;
 	while(1)
 	{
-		plc->WritePoint_PLC("WW", 502, ppr_1->actual_average_current(), false);
-		plc->WritePoint_PLC("WW", 504, ppr_1->actual_average_voltage(), false);
-		plc->WritePoint_PLC("WW", 505, ppr_2->actual_average_current(), false);
-		plc->WritePoint_PLC("WW", 506, ppr_2->actual_average_voltage(), false);
-		Thread::sleep(1000);
+		value = ppr->actual_average_current(1);
+		if(value != 65535)
+		{
+			plc->WritePoint_PLC("DM", 20000, value, false);
+		}
+		Thread::sleep(500);
+
+		value = ppr->actual_average_current(2);
+		if(value != 65535)
+		{
+			plc->WritePoint_PLC("DM", 20001, value, false);
+		}
+		Thread::sleep(500);
+
+		value = ppr->actual_average_voltage(1);
+		if(value != 65535)
+		{
+			plc->WritePoint_PLC("DM", 20002, value, false);
+		}
+		Thread::sleep(500);
+
+		value = ppr->actual_average_voltage(2);
+		if(value != 65535)
+		{
+			plc->WritePoint_PLC("DM", 20003, value, false);
+		}
+		Thread::sleep(500);
 	}
 }
 
@@ -1448,12 +1508,24 @@ bool Prod::startPPR(int index)
 		}
 		std::vector<PPR_Waveform_Table> ppr_recipe;
 		ppr_recipe.push_back(tempTable);
-		ppr_1->waveform_set(100, ppr_recipe);
-		ppr_2->waveform_set(100, ppr_recipe);
+		if(ppr->waveform_set(1, 100, ppr_recipe) != 0)
+		{
+			throw ApplicationException("PPR 1 waveform_set error");
+		}
+		if(ppr->waveform_set(2, 100, ppr_recipe) != 0)
+		{
+			throw ApplicationException("PPR 2 waveform_set error");
+		}
 		if(config->getBool("DEVICE.ENV"))
 		{
-			ppr_1->operation_start(true);
-			ppr_2->operation_start(true);
+			if(ppr->operation_start(1, true) != 0)
+			{
+				throw ApplicationException("PPR 1 operation_start error");
+			}
+			if(ppr->operation_start(2, true) != 0)
+			{
+				throw ApplicationException("PPR 2 operation_start error");
+			}
 		}
 		logger.information("啟動PPR成功");
 		return true;
@@ -1462,7 +1534,7 @@ bool Prod::startPPR(int index)
     {
         logger.error(e.displayText());
     }
-    return false;
+    startPPR(index);
 }
 
 bool Prod::ReadyProd(JSON::Object::Ptr data)
@@ -1522,7 +1594,7 @@ bool Prod::ReadyProd(JSON::Object::Ptr data)
 		/*舊有參數*/
 		std::string erpname = "";
 		JSON::Object::Ptr ppr_data = data->getObject("ppr_data");
-		JSON::Array::Ptr procpram = data->getObject("procdata")->getObject("procprams")->getArray("procpram");
+//		JSON::Array::Ptr procpram = data->getObject("procdata")->getObject("procprams")->getArray("procpram");
 		float RD05M47 = ppr_data->get("RD05M47").convert<float>();//長
 		logger.information("版高: %hf", RD05M47);
 		float RD05M48 = ppr_data->get("RD05M48").convert<float>();//寬
@@ -1543,7 +1615,10 @@ bool Prod::ReadyProd(JSON::Object::Ptr data)
 		{
 			if(!DistanceList.empty())
 			{
-				cout << DistanceList.front() << endl;
+				if(DistanceList.front() < 60)
+				{
+					throw ApplicationException("推桿位置小於60");
+				}
 				plc->WritePoint_PLC("EM_3", 30001+i, DistanceList.front(), true);
 				DistanceList.pop_front();
 			}

@@ -52,6 +52,8 @@ Uart::Uart(const char *devPath)
                         | INLCR | IGNCR | ICRNL | IXON);
     oldtio.c_lflag &= ~(ECHO | ECHONL | ICANON | ISIG | IEXTEN);
 
+    oldtio.c_oflag &= ~OPOST; /*Output*/
+        
     tcflush(uart_fd_, TCIFLUSH);
     tcsetattr(uart_fd_, TCSANOW, &oldtio);
 

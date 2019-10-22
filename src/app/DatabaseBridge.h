@@ -45,6 +45,7 @@
 #include "Poco/Path.h"
 #include "Poco/File.h"
 #include "Poco/StringTokenizer.h"
+#include "Poco/RegularExpression.h"
 
 #include "def.h"
 

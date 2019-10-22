@@ -18,9 +18,10 @@
 #include <iostream>
 #include <string>
 #include <sstream>
+#include "Poco/Mutex.h"
 
 #include "utility.h"
-#include "hal/modbustcp.h"
+#include "hal/modbustcp_slaveid.h"
 
 using namespace std;
 
@@ -46,7 +47,8 @@ public:
 	 * @param[in]   slave_id            PPR Slave ID for modbus RTU
 	 *
 	 */
-	PPRDEVICE(const char *uart_device, int slave_id);
+	//PPRDEVICE(const char *uart_device, int slave_id);
+	PPRDEVICE(const char *uart_device);
 
 	/**
 	 * @brief       Destructor of PPR
@@ -64,25 +66,25 @@ public:
 	* @param[in]   buffer          Buffer to Store Data Read from PLC
 	*
 	*/
-    int ppr_actual_status();
-	int ppr_actual_messages1();
-	int ppr_actual_messages2();
-	int ppr_actual_messages3();
-	int ppr_actual_messages4();
-	int ppr_actual_messages5();
+    int ppr_actual_status(int slave_id);
+	int ppr_actual_messages1(int slave_id);
+	int ppr_actual_messages2(int slave_id);
+	int ppr_actual_messages3(int slave_id);
+	int ppr_actual_messages4(int slave_id);
+	int ppr_actual_messages5(int slave_id);
 
-	int operation_start(bool mode);
+	int operation_start(int slave_id,bool mode);
 
-	int waveform_set(int regulator,const std::vector<PPR_Waveform_Table> PPR_Table);
+	int waveform_set(int slave_id,int regulator,const std::vector<PPR_Waveform_Table> PPR_Table);
 
-	int actual_counter_value(); // return counter
+	int actual_counter_value(int slave_id); // return counter
 
-	int actual_average_current(); // return current
+	int actual_average_current(int slave_id); // return current
 
-	int actual_average_voltage(); // return voltage
+	int actual_average_voltage(int slave_id); // return voltage
 
 
-	int waveform_check();
+	int waveform_check(int slave_id);
 
 	/**
 	 * @brief       Disconnect to PLC
@@ -91,10 +93,9 @@ public:
 	 */
 	void Shutdown();
 private:
-
 	template<typename T>
 	std::string int_to_hex(T i);
-
+	Mutex mutex;
 };
 
 

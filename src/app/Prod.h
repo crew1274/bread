@@ -235,8 +235,7 @@ public:
 	MyBridge* myb;
 	RedisBridge* rb;
 	LocalBridge* lb;
-	PPRDEVICE* ppr_1;
-	PPRDEVICE* ppr_2;
+	PPRDEVICE* ppr;
 	PLC* plc;
 	WebSocket* ws;
 	BasicEvent<JSON::Object> theEvent;

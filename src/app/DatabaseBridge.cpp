@@ -209,7 +209,21 @@ bool MESBridge::getRD05M136(std::string ERP_ITEMNO, std::string ERP_ITEMVER, std
 			throw ApplicationException("壓合站查無板厚資料");
 		}
 		StringTokenizer t(rs[0].convert<std::string>(), "~", StringTokenizer::TOK_TRIM | StringTokenizer::TOK_IGNORE_EMPTY);
-		RD05M136 = (NumberParser::parseFloat(t[0]) + NumberParser::parseFloat(t[1])) / 2;
+		if(t.count() == 2)
+		{
+			RD05M136 = (NumberParser::parseFloat(t[0]) + NumberParser::parseFloat(t[1])) / 2;
+		}
+		else if(t.count() == 1)
+		{
+			RegularExpression re1("[+-]?([0-9]*[.])?[0-9]+");
+			std::string s;
+			re1.extract(t[0], s);
+			RD05M136 = NumberParser::parseFloat(s);
+		}
+		else
+		{
+			throw ApplicationException("查無板厚");
+		}
 		return true;
 	}
 	catch(Exception& e)

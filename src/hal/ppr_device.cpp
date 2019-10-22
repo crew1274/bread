@@ -9,9 +9,9 @@
 
 using namespace std;
 
-PPRDEVICE::PPRDEVICE(const char *uart_device,int slave_id)
+PPRDEVICE::PPRDEVICE(const char *uart_device)
 				:modbus(uart_device,_mode_modbus_rtu){
-	modbus::modbus_set_slave_id(slave_id);
+//	modbus::modbus_set_slave_id(slave_id);
 }
 
 /**
@@ -34,12 +34,12 @@ void PPRDEVICE::Shutdown()
 }
 
 
-int PPRDEVICE::ppr_actual_status(){
+int PPRDEVICE::ppr_actual_status(int slave_id){
 // 整合所有狀態
 
 	uint16_t buffer[1];
 	memset(buffer,0,sizeof(buffer));
-	if(modbus::modbus_read_input_registers(2, 1, buffer)==false){
+	if(modbus::modbus_read_input_registers(slave_id,2, 1, buffer)==false){
 		cout << "ppr_actual_status (modbus error)" << endl;
 		return 65535;
 	}
@@ -74,12 +74,12 @@ int PPRDEVICE::ppr_actual_status(){
 	return buffer[0];
 }
 
-int PPRDEVICE::ppr_actual_messages1(){
+int PPRDEVICE::ppr_actual_messages1(int slave_id){
 // 整合所有狀態
 
 	uint16_t buffer[1];
 	memset(buffer,0,sizeof(buffer));
-	if(modbus::modbus_read_input_registers(5, 1, buffer)==false){
+	if(modbus::modbus_read_input_registers(slave_id, 5, 1, buffer)==false){
 		cout << "ppr_actual_messages1 (modbus error)" << endl;
 		return 65535;
 	}
@@ -135,12 +135,12 @@ int PPRDEVICE::ppr_actual_messages1(){
 	return buffer[0];
 }
 
-int PPRDEVICE::ppr_actual_messages2(){
+int PPRDEVICE::ppr_actual_messages2(int slave_id){
 // 整合所有狀態
 
 	uint16_t buffer[1];
 	memset(buffer,0,sizeof(buffer));
-	if(modbus::modbus_read_input_registers(6, 1, buffer)==false){
+	if(modbus::modbus_read_input_registers(slave_id, 6, 1, buffer)==false){
 		cout << "ppr_actual_messages2 (modbus error)" << endl;
 		return 65535;
 	}
@@ -195,12 +195,12 @@ int PPRDEVICE::ppr_actual_messages2(){
 	return buffer[0];
 }
 
-int PPRDEVICE::ppr_actual_messages3(){
+int PPRDEVICE::ppr_actual_messages3(int slave_id){
 // 整合所有狀態
 
 	uint16_t buffer[1];
 	memset(buffer,0,sizeof(buffer));
-	if(modbus::modbus_read_input_registers(7, 1, buffer)==false){
+	if(modbus::modbus_read_input_registers(slave_id, 7, 1, buffer)==false){
 		cout << "ppr_actual_messages3 (modbus error)" << endl;
 		return 65535;
 	}
@@ -255,12 +255,12 @@ int PPRDEVICE::ppr_actual_messages3(){
 	return buffer[0];
 }
 
-int PPRDEVICE::ppr_actual_messages4(){
+int PPRDEVICE::ppr_actual_messages4(int slave_id){
 // 整合所有狀態
 
 	uint16_t buffer[1];
 	memset(buffer,0,sizeof(buffer));
-	if(modbus::modbus_read_input_registers(8, 1, buffer)==false){
+	if(modbus::modbus_read_input_registers(slave_id, 8, 1, buffer)==false){
 		cout << "ppr_actual_messages4 (modbus error)" << endl;
 		return 65535;
 	}
@@ -315,12 +315,12 @@ int PPRDEVICE::ppr_actual_messages4(){
 	return buffer[0];
 }
 
-int PPRDEVICE::ppr_actual_messages5(){
+int PPRDEVICE::ppr_actual_messages5(int slave_id){
 // 整合所有狀態
 
 	uint16_t buffer[1];
 	memset(buffer,0,sizeof(buffer));
-	if(modbus::modbus_read_input_registers(9, 1, buffer)==false){
+	if(modbus::modbus_read_input_registers(slave_id, 9, 1, buffer)==false){
 		cout << "ppr_actual_messages5 (modbus error)" << endl;
 		return 65535;
 	}
@@ -367,64 +367,75 @@ int PPRDEVICE::ppr_actual_messages5(){
 	return buffer[0];
 }
 
-int PPRDEVICE::operation_start(bool mode){
+int PPRDEVICE::operation_start(int slave_id, bool mode){
  // mode = 1 開啟  / mode = 0 關閉
+	mutex.lock();
 	if (mode) {
-		if(modbus::modbus_write_register(0, 1)==false){
+		if(modbus::modbus_write_register(slave_id, 0, 1)==false){
 			cout << "operation_start -- start (modbus error)" << endl;
+			mutex.unlock();
 			return 65535;
 		}
 		cout << " operation <START> " << endl;
 	} else {
-		if(modbus::modbus_write_register(0, 0)==false){
+		if(modbus::modbus_write_register(slave_id, 0, 0)==false){
 			cout << "operation_start -- stop (modbus error)" << endl;
+			mutex.unlock();
 			return 65535;
 		}
 		cout << " operation <STOP> " << endl;
 	}
-
+	mutex.unlock();
 	return 0;
 }
 
-int PPRDEVICE::waveform_set(int regulator, std::vector<PPR_Waveform_Table> PPR_Table)
+int PPRDEVICE::waveform_set(int slave_id, int regulator, std::vector<PPR_Waveform_Table> PPR_Table)
 {
 // 檢查長度、寫連續點位
-
+	mutex.lock();
 	regulator = regulator * 100;
-	if(modbus::modbus_write_register(1, unsigned(regulator)) == false)
+	if(modbus::modbus_write_register(slave_id, 1, unsigned(regulator)) == false)
 	{
 		cout << "waveform_set (modbus error)" << endl;
+		mutex.unlock();
 		return 65535;
 	}
 	cout << "regulator = "  << unsigned(regulator) << endl;
 	for (uint ii = 0; ii < PPR_Table.size(); ii++)
 	{
-		if(modbus::modbus_write_register(ii*7 + 2, (uint16_t)((int)(PPR_Table[ii].Ix1*10)))==false){
+		if(modbus::modbus_write_register(slave_id, ii*7 + 2, (uint16_t)((int)(PPR_Table[ii].Ix1*10)))==false){
 			cout << "waveform_set --Ix1 (modbus error)" << endl;
+			mutex.unlock();
 			return 65535;
 		}
-		if(modbus::modbus_write_register(ii*7 + 3, (uint16_t)((int)(PPR_Table[ii].Ix2*10)))==false){
+		if(modbus::modbus_write_register(slave_id, ii*7 + 3, (uint16_t)((int)(PPR_Table[ii].Ix2*10)))==false){
 			cout << "waveform_set --Ix2 (modbus error)" << endl;
+			mutex.unlock();
 			return 65535;
 		}
-		if(modbus::modbus_write_register(ii*7 + 4, (uint16_t)((int)(PPR_Table[ii].Ux1*10)))==false){
+		if(modbus::modbus_write_register(slave_id, ii*7 + 4, (uint16_t)((int)(PPR_Table[ii].Ux1*10)))==false){
 			cout << "waveform_set --Ux1 (modbus error)" << endl;
+			mutex.unlock();
 			return 65535;
 		}
-		if(modbus::modbus_write_register(ii*7 + 5, (uint16_t)((int)(PPR_Table[ii].Ux2*10)))==false){
+		if(modbus::modbus_write_register(slave_id, ii*7 + 5, (uint16_t)((int)(PPR_Table[ii].Ux2*10)))==false){
 			cout << "waveform_set --Ux2 (modbus error)" << endl;
+			mutex.unlock();
 			return 65535;
 		}
-		if(modbus::modbus_write_register(ii*7 + 6, (uint16_t)((int)(PPR_Table[ii].Tx1*50)))==false){
+		if(modbus::modbus_write_register(slave_id, ii*7 + 6, (uint16_t)((int)(PPR_Table[ii].Tx1*50)))==false){
 			cout << "waveform_set --Tx1 (modbus error)" << endl;
+			mutex.unlock();
 			return 65535;
 		}
-		if(modbus::modbus_write_register(ii*7 + 7, (uint16_t)((int)(PPR_Table[ii].Tx2*50)))==false){
+		if(modbus::modbus_write_register(slave_id, ii*7 + 7, (uint16_t)((int)(PPR_Table[ii].Tx2*50)))==false){
 			cout << "waveform_set --Tx2 (modbus error)" << endl;
+			mutex.unlock();
 			return 65535;
 		}
-		if(modbus::modbus_write_register(ii*7 + 8, unsigned(PPR_Table[ii].Cycle)*2)==false){
+		if(modbus::modbus_write_register(slave_id, ii*7 + 8, unsigned(PPR_Table[ii].Cycle)*2)==false){
 			cout << "waveform_set --Cycle (modbus error)" << endl;
+			mutex.unlock();
 			return 65535;
 		}
 
@@ -440,32 +451,39 @@ int PPRDEVICE::waveform_set(int regulator, std::vector<PPR_Waveform_Table> PPR_T
 
 	for (uint ii = PPR_Table.size(); ii < PPR_Table.size()+1; ii++)
 	{
-		if(modbus::modbus_write_register(ii*7 + 2, 0)==false){
+		if(modbus::modbus_write_register(slave_id, ii*7 + 2, 0)==false){
 			cout << "waveform_set (modbus error)" << endl;
+			mutex.unlock();
 			return 65535;
 		}
-		if(modbus::modbus_write_register(ii*7 + 3, 0)==false){
+		if(modbus::modbus_write_register(slave_id, ii*7 + 3, 0)==false){
 			cout << "waveform_set (modbus error)" << endl;
+			mutex.unlock();
 			return 65535;
 		}
-		if(modbus::modbus_write_register(ii*7 + 4, 0)==false){
+		if(modbus::modbus_write_register(slave_id, ii*7 + 4, 0)==false){
 			cout << "waveform_set (modbus error)" << endl;
+			mutex.unlock();
 			return 65535;
 		}
-		if(modbus::modbus_write_register(ii*7 + 5, 0)==false){
+		if(modbus::modbus_write_register(slave_id, ii*7 + 5, 0)==false){
 			cout << "waveform_set (modbus error)" << endl;
+			mutex.unlock();
 			return 65535;
 		}
-		if(modbus::modbus_write_register(ii*7 + 6, 0)==false){
+		if(modbus::modbus_write_register(slave_id, ii*7 + 6, 0)==false){
 			cout << "waveform_set (modbus error)" << endl;
+			mutex.unlock();
 			return 65535;
 		}
-		if(modbus::modbus_write_register(ii*7 + 7, 0)==false){
+		if(modbus::modbus_write_register(slave_id, ii*7 + 7, 0)==false){
 			cout << "waveform_set (modbus error)" << endl;
+			mutex.unlock();
 			return 65535;
 		}
-		if(modbus::modbus_write_register(ii*7 + 8, 0)==false){
+		if(modbus::modbus_write_register(slave_id, ii*7 + 8, 0)==false){
 			cout << "waveform_set (modbus error)" << endl;
+			mutex.unlock();
 			return 65535;
 		}
 
@@ -478,13 +496,13 @@ int PPRDEVICE::waveform_set(int regulator, std::vector<PPR_Waveform_Table> PPR_T
 //		cout << "Cycle = "  << unsigned(PPR_Table[ii].Cycle) << endl;
 
 	}
-
+	mutex.unlock();
 	return 0;
 }
 
-int PPRDEVICE::waveform_check(){
+int PPRDEVICE::waveform_check(int slave_id){
 	uint16_t buffer[200];
-	if(modbus::modbus_read_holding_registers(1,110,buffer)==false){
+	if(modbus::modbus_read_holding_registers(slave_id, 1,110,buffer)==false){
 		cout << "waveform_check (modbus error)" << endl;
 		return 65535;
 	}
@@ -492,11 +510,11 @@ int PPRDEVICE::waveform_check(){
 		cout << "read ("<<ii+1 <<") "  << buffer[ii] << endl;
 	return 0;
 }
-int PPRDEVICE::actual_counter_value(){
+int PPRDEVICE::actual_counter_value(int slave_id){
 
 	uint16_t buffer[2];
 	memset(buffer,0,sizeof(buffer));
-	if(modbus::modbus_read_input_registers(0, 2, buffer)==false){
+	if(modbus::modbus_read_input_registers(slave_id, 0, 2, buffer)==false){
 		cout << "actual_counter_value (modbus error)" << endl;
 		return 65535;
 	}
@@ -504,27 +522,43 @@ int PPRDEVICE::actual_counter_value(){
 	return int((buffer[0]<<16)+buffer[1]) ;
 }
 
-int PPRDEVICE::actual_average_current()
+int PPRDEVICE::actual_average_current(int slave_id)
 {
-	uint16_t buffer[1];
-	memset(buffer,0,sizeof(buffer));
-	if(modbus::modbus_read_input_registers(3, 1, buffer)==false){
-		cout << "actual_average_current (modbus error)" << endl;
+	if(!mutex.tryLock())
+	{
 		return 65535;
 	}
-	cout << "actual_average_current: " << buffer[0] << endl;
-	return int(buffer[0]) ;
+	else
+	{
+		uint16_t buffer[1];
+		memset(buffer,0,sizeof(buffer));
+		if(modbus::modbus_read_input_registers(slave_id, 3, 1, buffer)==false)
+		{
+			cout << "actual_average_current (modbus error)" << endl;
+			mutex.unlock();
+			return 65535;
+		}
+		mutex.unlock();
+	//	cout << "actual_average_current: " << buffer[0] << endl;
+		return int(buffer[0]) ;
+	}
 }
 
-int PPRDEVICE::actual_average_voltage()
+int PPRDEVICE::actual_average_voltage(int slave_id)
 {
-	uint16_t buffer[1];
-	memset(buffer,0,sizeof(buffer));
-	if(modbus::modbus_read_input_registers(4, 1, buffer)==false){
-		cout << "actual_average_voltage (modbus error)" << endl;
+	if(!mutex.tryLock())
+	{
 		return 65535;
 	}
-	cout << "actual_average_voltage: " << buffer[0] << endl;
+	uint16_t buffer[1];
+	memset(buffer,0,sizeof(buffer));
+	if(modbus::modbus_read_input_registers(slave_id, 4, 1, buffer)==false){
+		cout << "actual_average_voltage (modbus error)" << endl;
+		mutex.unlock();
+		return 65535;
+	}
+	mutex.unlock();
+//	cout << "actual_average_voltage: " << buffer[0] << endl;
 	return int(buffer[0]) ;
 }
 

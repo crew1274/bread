@@ -73,15 +73,15 @@ public:
 
     void modbus_set_slave_id(int id);
 
-    bool modbus_read_coils(int address, int amount, bool* buffer);
-    bool modbus_read_input_bits(int address, int amount, bool* buffer);
-    bool modbus_read_holding_registers(int address, int amount, uint16_t *buffer);
-    bool modbus_read_input_registers(int address, int amount, uint16_t *buffer);
+    bool modbus_read_coils(int slave_id,int address, int amount, bool* buffer);
+    bool modbus_read_input_bits(int slave_id,int address, int amount, bool* buffer);
+    bool modbus_read_holding_registers(int slave_id,int address, int amount, uint16_t *buffer);
+    bool modbus_read_input_registers(int slave_id,int address, int amount, uint16_t *buffer);
 
-    bool modbus_write_coil(int address, bool to_write);
-    bool modbus_write_register(int address, uint16_t value);
-    bool modbus_write_coils(int address, int amount, bool* value );
-    bool modbus_write_registers(int address, int amount, uint16_t *value);
+    bool modbus_write_coil(int slave_id,int address, bool to_write);
+    bool modbus_write_register(int slave_id,int address, uint16_t value);
+    bool modbus_write_coils(int slave_id,int address, int amount, bool* value );
+    bool modbus_write_registers(int slave_id,int address, int amount, uint16_t *value);
 
 private:
     bool _connected;
@@ -94,13 +94,13 @@ private:
     struct sockaddr_in _server;
     Uart *uart_modbus_rtu_;
 
-    void modbus_build_request(uint8_t *to_send,int address, int func);
+    void modbus_build_request(int slave_id,uint8_t *to_send,int address, int func);
 
-    void modbus_read(int address, int amount, int func);
-    void modbus_write(int address, int amount, int func, uint16_t *value);
+    void modbus_read(int slave_id,int address, int amount, int func);
+    void modbus_write(int slave_id,int address, int amount, int func, uint16_t *value);
 
-    ssize_t modbus_send(uint8_t *to_send, int length);
-    ssize_t modbus_receive(uint8_t *buffer);
+    ssize_t modbus_send(int slave_id,uint8_t *to_send, int length);
+    ssize_t modbus_receive(int slave_id,uint8_t *buffer);
 
     void modbus_error_handle(uint8_t *msg, int func);
 };
