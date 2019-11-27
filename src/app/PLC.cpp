@@ -261,7 +261,6 @@ void PLC::LoadAlarm(std::string fileName)
 					letterRegularExpression.extract(temp[1], type);
 					if(type == "")
 					{
-						logger.information("CIO");
 						type = "CIO";
 					}
 //					cout << "type: " << type << endl;
@@ -273,7 +272,6 @@ void PLC::LoadAlarm(std::string fileName)
 					ALARM_DATA.address.push_back(TP);
 					ALARM_DATA.pre.push_back(0);
 					ALARM_DATA.msg.push_back(object_temp->getValue<std::string>("Message"));
-//					cout << "Message: " << ALARM_DATA.msg.back() << endl;
 				}
 			}
 			if(ALARM_DATA.msg.size() == ALARM_DATA.address.size())
@@ -301,40 +299,40 @@ void PLC::Base(Timer& timer)
 {
 	if(!PLCmutex.tryLock())
 	{
-		logger.warning("PLC mutex locked");
+//		logger.trace("PLC mutex locked");
 		return;
 	}
 	else
 	{
 //		_stopwatch.start();
-		if(ReadData_MultipleArea_V2(PLC_DATA.MultipleAreaReads) == -1)
-		{
-			logger.warning("PLC_DATA.MultipleAreaReads return -1");
-		}
-		PLCmutex.unlock();
+//		if(ReadData_MultipleArea_V2(PLC_DATA.MultipleAreaReads) == -1)
+//		{
+//			logger.warning("PLC_DATA.MultipleAreaReads return -1");
+//		}
+//
 //		_stopwatch.stop();
 //		logger.trace("elapsed: %?d", _stopwatch.elapsed());
 //		_stopwatch.reset();
-		if(pre <=10 && PLC_DATA.MultipleAreaReads[8].return_value > 10)
-		{
-			std::stringstream output;
-			logger.warning("電鍍電流不為0, D601:%z", PLC_DATA.MultipleAreaReads[8].return_value);
-			logger.warning("電鍍電流不為0, D1301:%z", PLC_DATA.MultipleAreaReads[9].return_value);
-			logger.warning("電鍍電流不為0, D1302:%z", PLC_DATA.MultipleAreaReads[10].return_value);
-			logger.warning("電鍍電流不為0, D1303:%z", PLC_DATA.MultipleAreaReads[11].return_value);
-			logger.warning("電鍍電流不為0, D1304:%z", PLC_DATA.MultipleAreaReads[12].return_value);
-			output << PLC_DATA.MultipleAreaReads[8].return_value << ",";
-			output << PLC_DATA.MultipleAreaReads[9].return_value << ",";
-			output << PLC_DATA.MultipleAreaReads[10].return_value << ",";
-			output << PLC_DATA.MultipleAreaReads[11].return_value << ",";
-			output << PLC_DATA.MultipleAreaReads[12].return_value << ",";
-			Utility::WriteLog("D601.txt", output.str());
-		}
-		pre = PLC_DATA.MultipleAreaReads[8].return_value;
+//		if(pre <=10 && PLC_DATA.MultipleAreaReads[8].return_value > 10)
+//		{
+//			std::stringstream output;
+//			logger.warning("電鍍電流不為0, D601:%z", PLC_DATA.MultipleAreaReads[8].return_value);
+//			logger.warning("電鍍電流不為0, D1301:%z", PLC_DATA.MultipleAreaReads[9].return_value);
+//			logger.warning("電鍍電流不為0, D1302:%z", PLC_DATA.MultipleAreaReads[10].return_value);
+//			logger.warning("電鍍電流不為0, D1303:%z", PLC_DATA.MultipleAreaReads[11].return_value);
+//			logger.warning("電鍍電流不為0, D1304:%z", PLC_DATA.MultipleAreaReads[12].return_value);
+//			output << PLC_DATA.MultipleAreaReads[8].return_value << ",";
+//			output << PLC_DATA.MultipleAreaReads[9].return_value << ",";
+//			output << PLC_DATA.MultipleAreaReads[10].return_value << ",";
+//			output << PLC_DATA.MultipleAreaReads[11].return_value << ",";
+//			output << PLC_DATA.MultipleAreaReads[12].return_value << ",";
+//			Utility::WriteLog("D601.txt", output.str());
+//		}
+//		pre = PLC_DATA.MultipleAreaReads[8].return_value;
 
 		if(ReadData_MultipleArea_V2(ALARM_DATA.address) == -1)
 		{
-			logger.warning("ALARM_DATA.address return -1");
+			logger.warning("PLC ALARM_DATA return -1");
 		}
 		for(uint i=0; i<ALARM_DATA.address.size(); i++)
 		{
@@ -342,11 +340,12 @@ void PLC::Base(Timer& timer)
 			{
 				logger.error("警報:%s", ALARM_DATA.msg[i]);
 				//建立警報
-				nc->postNotification(new AlarmNotification(ALARM_DATA.msg[i],
-						ALARM_DATA.address[i].return_value == 1? true: false));
+				nc->postNotification(new AlarmNotification(ALARM_DATA.msg[i], "PLC",
+						ALARM_DATA.address[i].return_value == 1 ? true: false));
 				ALARM_DATA.pre[i] = ALARM_DATA.address[i].return_value;
 			}
 		}
+		PLCmutex.unlock();
 	}
 }
 

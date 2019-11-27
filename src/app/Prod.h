@@ -135,6 +135,8 @@
 #include "Poco/File.h"
 #include "Poco/JSON/Stringifier.h"
 #include "Poco/Dynamic/Var.h"
+#include "Poco/Random.h"
+#include "Poco/RandomStream.h"
 
 #include "utility.h"
 #include "app/DatabaseBridge.h"
@@ -182,31 +184,14 @@ class Prod
 {
 public:
 	Prod(AutoPtr<AbstractConfiguration> _config, Rfid_ds* _RFID, MESBridge* _mb, MyBridge* _myb, RedisBridge* _rb,
-			LocalBridge* _lb, PLC* _plc, WebSocket* _ws);
+			LocalBridge* _lb, ArangoBridge* _ab, PLC* _plc, WebSocket* _ws);
 	~Prod();
-	void ClearEvent();
-	void WaitEvent();
-	void Reader();
-	bool forWS(std::string LotNO, std::string ProcSeq, std::string Operator);
-	void failedHandle(std::string deatail);
-	void forPreMO();
-	void wsSend(Object& inner, std::ostringstream& oss);
-	bool WaitResponse(std::string key, std::string value, int elapsed);
-	bool StartPLC(int random);
 	std::list<int> ConvertDistance(int number, int width, bool withDummy); //轉換放置位置
-	bool getProcSeq(std::string payload, std::string& ProcSeq);
-	bool RecipeRequest(std::string LotNO, std::string ProcSeq, std::string& response);
-	bool ParseXML(std::string payload, std::string target, uint length);
-	bool ExtractXML(std::string payload);
-	void Reset();
-	bool Rebuild(std::string &payload);
-	bool SendCommand(std::string command1, std::string command2, std::string &respond);
-	bool Confirm(std::string cammand, std::string target);
-	bool checkInfo();
-	bool checkPLC();
-	void showMap(std::map<std::string, std::string> data);
-	void testMO();
-	void init_Recipes_extend();
+//	bool getProcSeq(std::string payload, std::string& ProcSeq);
+//	bool RecipeRequest(std::string LotNO, std::string ProcSeq, std::string& response);
+//	bool ParseXML(std::string payload, std::string target, uint length);
+//	bool ExtractXML(std::string payload);
+//	bool Rebuild(std::string &payload);
 	bool CallAGV();
 
 	void forPPR();
@@ -217,16 +202,11 @@ public:
 	void ActiveResponse();
 	bool ReadyProd(JSON::Object::Ptr data);
 	bool confirmProd();
-
-	struct work_point
-	{
-		std::string name;
-		MultipleAreaRead temp_area;
-		MultipleAreaRead work_work;
-	};
-
-
-
+	void handleAlarm(AlarmNotification* pNf);
+	void toTSDB(const std::string& payload);
+	void insertHistory();
+	void updateHistory();
+	std::string random_string( size_t length );
 	//生產使用物件
 	Logger& logger;
 	AutoPtr<AbstractConfiguration> config;
@@ -235,30 +215,21 @@ public:
 	MyBridge* myb;
 	RedisBridge* rb;
 	LocalBridge* lb;
-	PPRDEVICE* ppr;
+	ArangoBridge* ab;
+//	PPRDEVICE* ppr;
 	PLC* plc;
 	WebSocket* ws;
-	BasicEvent<JSON::Object> theEvent;
-	//生產使用參數
-	std::map<std::string, std::string> Recipes;
-	std::map<std::string, std::string> Recipes_extend;
-//	std::map<std::string, std::string> Counts;
-	std::map<std::string, std::string> MO;
-//	RunnableAdapter<Prod> runnableForMO;
-//	Record rc;
+	BasicEvent<JSON::Object> theEvent; //ws推播機制
+	std::string receiveMSG; //ws接收資料
+	bool isFine; //ws回復狀態
 	Mutex ProdMutex; //生產互斥鎖
-	std::string receiveMSG;
-	std::string TempData;
-	bool BreakPoint;
-	bool isFine;
-	bool isStart;
-	int counter;
-	std::string barcode;
 	Object Recipe;
-	WSEvent _WSEvent;
+	bool BreakPoint;
 	int PPRstatus;
+	int PRE_PPRstatus;
+	std::map<int, std::string> PPRstatusMap;
 	bool ActiveDetect;
-
+    ActiveMethod<void, std::string, Prod> _ActiveMethod;
 };
 
 #endif /* SRC_APP_PROD_H_ */

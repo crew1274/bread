@@ -19,6 +19,7 @@
 #include <string>
 #include <sstream>
 #include "Poco/Mutex.h"
+#include "Poco/Exception.h"
 
 #include "utility.h"
 #include "hal/modbustcp_slaveid.h"

@@ -8,12 +8,16 @@
 #include <app/Network.h>
 
 Network::Network(AutoPtr<AbstractConfiguration> _config):
-	logger(Logger::get("Network")),
-	config(_config),
-	runnable(*this, &Network::DisconnectAlarm)
+	logger(Logger::get("Network")), config(_config)
 {
 	// TODO Auto-generated constructor stub
 	Last = Timestamp();
+	token = "";
+//	getToken("root", "root");
+//	cout << token << endl;
+//	getToken("root", "root");
+//	cout << token << endl;
+//	getVersion();
 }
 
 Network::~Network()
@@ -34,7 +38,7 @@ Network::~Network()
  * @note { I am redirecting stderr to stdout.  I would recommend
  *         capturing this information separately.}
  */
-void Network::Ping(Poco::Timer& timer)
+void Network::Ping(Timer& timer)
 {
 	ICMPClient icmpClient(IPAddress::IPv4);
 	//if(icmpClient.ping(pconfig->getString("PLC.IP", "192.168.3.208")))
@@ -52,47 +56,43 @@ void Network::Ping(Poco::Timer& timer)
 	}
 }
 
-void Network::DisconnectAlarm()
+void Network::getVersion()
 {
-	try
-	{
-
-	}
-	catch(Exception& e)
-	{
-		logger.error(e.displayText());
-	}
+	HTTPClientSession session("10.11.0.156", 8529);
+	HTTPRequest request(HTTPRequest::HTTP_GET, "/_api/version", HTTPMessage::HTTP_1_1);
+	HTTPResponse response;
+	request.add("Authorization", token);
+	request.setContentType("application/json");
+	session.sendRequest(request);
+	istream& rs = session.receiveResponse(response);
+	string s((istreambuf_iterator<char>(rs)), istreambuf_iterator<char>());
+	cout << s << endl;
 }
 
-void Network::SendMail(std::string payload)
+void Network::getToken(std::string username, std::string password)
 {
-	try
-	{
-		MailMessage message;
-		message.setSender(MailMessage::encodeWord("黃偉鑫")+"<wilson-huang@cht-pt.com.tw>");
-		//message.addRecipient(MailRecipient(MailRecipient::PRIMARY_RECIPIENT, "hlhsieh@cht-pt.com.tw", MailMessage::encodeWord("謝欣龍")));
-		//message.addRecipient(MailRecipient(MailRecipient::PRIMARY_RECIPIENT, "kyrie_chang@cht-pt.com.tw", MailMessage::encodeWord("張康庭")));
-		//message.addRecipient(MailRecipient(MailRecipient::PRIMARY_RECIPIENT, "matic.chiu@cht-pt.com.tw", MailMessage::encodeWord("邱信暐")));
-		//message.addRecipient(MailRecipient(MailRecipient::PRIMARY_RECIPIENT, "pt.liu@cht-pt.com.tw", MailMessage::encodeWord("劉邦慈")));
-		message.addRecipient(MailRecipient(MailRecipient::PRIMARY_RECIPIENT, "wilson-huang@cht-pt.com.tw", MailMessage::encodeWord("黃偉鑫")));
-		//message.addRecipient(MailRecipient(MailRecipient::CC_RECIPIENT, "wilson-huang@cht-pt.com.tw", MailMessage::encodeWord("黃偉鑫")));
-		//message.addRecipient(MailRecipient(MailRecipient::CC_RECIPIENT, "henry_jeng@cht-pt.com.tw", MailMessage::encodeWord("鄭智鴻")));
+		HTTPClientSession session("10.11.0.156", 8529);
+		HTTPRequest request(HTTPRequest::HTTP_POST, "/_open/auth", HTTPMessage::HTTP_1_1);
+		request.add("Authorization", token);
+		request.setContentType("application/json");
+		std::stringstream ss;
 
-		message.setSubject(MailMessage::encodeWord(config->getString("PLC.ID"))+"Edge"+MailMessage::encodeWord("有異常狀況, 請盡快處理"));
-		std::string content;
-		content += "Dear all \r\n\r\n";
-		content += Utility::NowTime(false);
-		content += payload;
-		message.addContent(new StringPartSource(content));
-		//message.addAttachment("logo", new StringPartSource(logo, "image/gif"));
-		SMTPClientSession session("192.168.1.200");
-		session.login();
-		session.sendMessage(message);
-		session.close();
-		Last = Timestamp();
-	}
-	catch (Exception& e)
-	{
-		logger.error(e.displayText());
-	}
+		JSON::Object paylod;
+		paylod.set("username", username);
+		paylod.set("password", password);
+
+		paylod.stringify(ss);
+		request.setContentLength(ss.str().size());
+
+		std::ostream& BodyOstream = session.sendRequest(request); // sends request, returns open stream
+		paylod.stringify(BodyOstream);
+		HTTPResponse response;
+		istream& rs = session.receiveResponse(response);
+		string s((istreambuf_iterator<char>(rs)), istreambuf_iterator<char>());
+
+		Parser parser;
+		JSON::Object::Ptr ret = parser.parse(s).extract<JSON::Object::Ptr>();
+		token = "Bearer "+ret->get("jwt").convert<std::string>();
 }
+
+

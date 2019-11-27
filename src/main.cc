@@ -134,6 +134,7 @@
 #include "Poco/Message.h"
 #include "Poco/Exception.h"
 #include "Poco/File.h"
+#include "Poco/MongoDB/JavaScriptCode.h"
 
 #include "app/PLC.h"
 #include "app/Prod.h"
@@ -748,14 +749,15 @@ protected:
 		myb = new MyBridge();
 		rb = new RedisBridge("127.0.0.1", 6379);
 		lb = new LocalBridge(&(config()));
+		ab = new ArangoBridge("10.11.0.156", 8529, "VCP-30");
 		plc = new PLC(config().getString("PLC.ID"), &(config()), nc);
 		plc->Connect(config().getString("PLC.IP").c_str(), 9600, "eth0", PROTOCOLTYPE_TCP);
-		plc->Load();
-//		plc->LoadAlarm(config().getString("PLC.ALARM_FILE"));
+//		plc->Load();
+		plc->LoadAlarm(config().getString("PLC.ALARM_FILE"));
 		ws = NULL;
-		prod = new Prod(&(config()), RFID, mb, myb, rb, lb, plc, ws);
+		prod = new Prod(&(config()), RFID, mb, myb, rb, lb, ab, plc, ws);
 		/*加入監聽事件*/
-		nc->addObserver(Observer<MyBridge, AlarmNotification>(*myb, &MyBridge::handleAlarm));
+		nc->addObserver(Observer<Prod, AlarmNotification>(*prod, &Prod::handleAlarm));
 	}
 
 	void uninitialize()
@@ -814,23 +816,10 @@ protected:
 			logger.information("啟動PLC資料紀錄功能");
 			PLCTimer.start(TimerCallback<PLC>(*plc, &PLC::Base));
 		}
-		/* RFID觸發 流程 */
-		RunnableAdapter<Prod> runnableReader(*prod, &Prod::Reader);
-//		RunnableAdapter<Prod> runnableforPreMO(*prod, &Prod::forPreMO);
-//		RunnableAdapter<Prod> runnableforWaitEvent(*prod, &Prod::WaitEvent);
-		RunnableAdapter<Prod> runnableforPPRloop(*prod, &Prod::PPRloop);
 		RunnableAdapter<Prod> runnableforBackgroundPPR(*prod, &Prod::BackgroundPPR);
 		RunnableAdapter<Prod> runnableforActiveResponse(*prod, &Prod::ActiveResponse);
-		ThreadPool::defaultPool().start(runnableforPPRloop);
 		ThreadPool::defaultPool().start(runnableforActiveResponse);
 		ThreadPool::defaultPool().start(runnableforBackgroundPPR);
-		if(config().getBool("PROGRAM.READER", false))
-		{
-			logger.information("啟動RFID reader");
-			ThreadPool::defaultPool().start(runnableReader);
-//			ThreadPool::defaultPool().start(runnableforPreMO);
-//			ThreadPool::defaultPool().start(runnableforWaitEvent);
-		}
 		// set-up a server socket
 		ServerSocket svs(config().getInt("DEVICE.PORT", 9999));
 		// set-up a HTTPServer instance
@@ -853,6 +842,7 @@ private:
 	MyBridge* myb;
 	RedisBridge* rb;
 	LocalBridge* lb;
+	ArangoBridge* ab;
 	WebSocket* ws;
 	PLC* plc;
 	NotificationCenter* nc;

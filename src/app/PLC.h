@@ -85,13 +85,13 @@ public:
 	bool isWorking;
 	std::vector<MultipleAreaRead> MultipleAreaReads; //點位資料
 	std::vector<float> ratios; //倍率
-	struct PLC_DATA
+	struct PLC_DAT
 	{
 		std::vector<MultipleAreaRead> MultipleAreaReads;
 		std::vector<float> DATA_RATIO;
 		std::vector<std::string> OPC_TAGNAME;
 	}PLC_DATA;
-	struct ALARM_DATA
+	struct ALARM_DATA //警報資料結構
 	{
 		std::vector<MultipleAreaRead> address;
 		std::vector<uint> pre;
@@ -99,7 +99,6 @@ public:
 	}ALARM_DATA;
 	virtual std::string getName() {return EngName;};
 	std::string EngName;
-	int pre;
 protected:
 	Logger& logger;
 	AutoPtr<AbstractConfiguration> config;

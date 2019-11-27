@@ -149,7 +149,7 @@ void modbus::modbus_build_request(int slave_id,uint8_t *to_send, int address, in
 		to_send[2] = (uint8_t) (address >> 8);
 		to_send[3] = (uint8_t) (address & 0x00FF);
 	}else{
-		std::cout <<"Connect mode error! " <<std::endl;
+		std::cout <<"modbus_build_request - Connect mode error! " <<std::endl;
 	}
 }
 
@@ -227,7 +227,7 @@ void modbus::modbus_write(int slave_id,int address, int amount, int func, uint16
 			modbus_send(slave_id, to_send, 8 + (amount - 1) / 8);
 		}
 	}else{
-		cout << "mode error !" << endl ;
+		cout << "modbus_write - mode error !" << endl ;
 	}
 }
 
@@ -254,7 +254,7 @@ void modbus::modbus_read(int slave_id,int address, int amount, int func){
 		to_send[5] = (uint8_t) (amount & 0x00FF);
 		modbus_send(slave_id,to_send, 6);
 	}else{
-		cout << "mode error !" << endl ;
+		cout << "modbus_read - mode error !" << endl ;
 	}
 }
 
@@ -310,7 +310,7 @@ bool modbus::modbus_read_holding_registers(int slave_id,int address, int amount,
 //			throw modbus_connect_exception();
 //		}
 	}else{
-		cout << "mode error !" << endl ;
+		cout << "modbus_read_holding_registers - mode error !" << endl ;
 		return false;
 	}
 	return true;
@@ -368,7 +368,7 @@ bool modbus::modbus_read_input_registers(int slave_id, int address, int amount, 
 //			throw modbus_connect_exception();
 //		}
 	}else{
-		cout << "mode error !" << endl ;
+		cout << "modbus_read_input_registers - mode error !" << endl ;
 		return false;
 	}
 	return true;
@@ -532,7 +532,7 @@ bool modbus::modbus_write_coil(int slave_id, int address, bool to_write) {
 //			throw modbus_connect_exception();
 //		}
 	}else{
-		cout << "mode error !" << endl ;
+		cout << "modbus_write_coil - mode error !" << endl ;
 		return false;
 	}
 	return true;
@@ -585,7 +585,7 @@ bool modbus::modbus_write_register(int slave_id, int address, uint16_t value) {
 	}
 	else
 	{
-		cout << "mode error !" << endl ;
+		cout << "modbus_write_register - mode error !" << endl ;
 		return false;
 	}
 	return true;
@@ -643,7 +643,7 @@ bool modbus::modbus_write_coils(int slave_id, int address, int amount, bool *val
 //			throw modbus_connect_exception();
 //		}
 	}else{
-		cout << "mode error !" << endl ;
+		cout << "modbus_write_coils - mode error !" << endl ;
 		return false;
 	}
 	return true;
@@ -700,7 +700,7 @@ bool modbus::modbus_write_registers(int slave_id, int address, int amount, uint1
 //			throw modbus_connect_exception();
 //		}
 	}else{
-		cout << "mode error !" << endl ;
+		cout << "modbus_write_registers - mode error !" << endl ;
 		return false;
 	}
 	return true;
@@ -774,7 +774,8 @@ ssize_t modbus::modbus_receive(int slave_id, uint8_t *buffer) {
  * @param msg   Message Received from the Server
  * @param func  Modbus Functional Code
  */
-void modbus::modbus_error_handle(uint8_t *msg, int func) {
+void modbus::modbus_error_handle(uint8_t *msg, int func)
+{
 	if(_mode == _mode_modbus_tcp){
 		if(msg[7] == 0 & msg[8] == 0)
 			throw modbus_disconnect_or_not_response_exception();

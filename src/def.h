@@ -116,46 +116,32 @@ struct pipe
 	int pipe_fd;
 };
 
-struct WaitTankParameter
+struct ERRORmessage
 {
-	int		Tank;
-	uint	Value;
-	bool 	ReturnStatus;
+	std::string datetime;
+	std::string message;
+	std::string device;
+	bool status;
 };
 
 struct recipe
 {
-	std::string Name;
-	std::string NewPageAddress; //key
-	std::string IndexPageAddress;
-	uint PLCPoint;
-	std::string Value;
-};
-
-struct HMIParameter
-{
-	bool	doSEND;
-	std::string	page;
-	std::string	text;
-	std::string	value;
-};
-
-struct TowerLightParameter
-{
-	bool doSEND;
-	bool red;
-	bool yellow;
-	bool green;
-	bool alarm;
-	int elapsed;
+	std::string LOTNO;
+	std::string PARTNO;
+	std::string STARTDATETIME;
+	std::string ENDDATETIME;
+	std::string RANDOMSTRING;
+	std::string SOURCE;
 };
 
 class AlarmNotification: public Notification
 {
 public:
-	AlarmNotification(std::string _msg, bool _status):msg(_msg), status(_status){}
+	AlarmNotification(std::string _msg, std::string _device, bool _status):msg(_msg), device(_device), status(_status)
+{}
 	~AlarmNotification(){};
 	std::string msg;
+	std::string device;
 	bool status;
 };
 

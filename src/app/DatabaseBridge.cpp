@@ -215,14 +215,36 @@ bool MESBridge::getRD05M136(std::string ERP_ITEMNO, std::string ERP_ITEMVER, std
 		}
 		else if(t.count() == 1)
 		{
-			RegularExpression re1("[+-]?([0-9]*[.])?[0-9]+");
-			std::string s;
-			re1.extract(t[0], s);
-			RD05M136 = NumberParser::parseFloat(s);
+			//單邊
+			Statement select_1(session);
+			select_1 << "SELECT ISNULL(FGDCOPPERTHICK, '') FGDCOPPERTHICK, ISNULL(THICK, '') THICK FROM [MESSERIES].[dbo].[VW_IOT_TBLCAMPCBPRESS]"
+						" WHERE ERP_ITEMNO = '" << ERP_ITEMNO << "' "
+						" AND ERP_ITEMVER = '" << ERP_ITEMVER << "' "
+						" AND MFVER = '" << MFVER << "'";
+			logger.information(select_1.toString());
+			select_1.execute();
+			RecordSet result(select_1);
+			logger.information("totalRowCount: %z", result.totalRowCount());
+			bool more = result.moveFirst();
+			double sum = 0;
+			double temp;
+			while(more)
+			{
+				if(NumberParser::tryParseFloat(result[0].convert<std::string>(), temp))
+				{
+					sum = sum + temp;
+				}
+				else
+				{
+					sum = sum + NumberParser::parseFloat(result[1].convert<std::string>());
+				}
+				more = result.moveNext();
+			}
+			RD05M136 = sum * 0.0254;
 		}
 		else
 		{
-			throw ApplicationException("查無板厚");
+			throw ApplicationException("板厚規格無法拆解");
 		}
 		return true;
 	}
@@ -256,7 +278,7 @@ RedisBridge::~RedisBridge(){
 
 void RedisBridge::cmd(std::vector<std::string> cmds)
 {
-	Array cmd;
+	Redis::Array cmd;
 	for(uint i=0; i< cmds.size(); i++)
 	{
 		cmd << cmds[i];
@@ -361,7 +383,7 @@ bool RedisBridge::smembers(std::string table, std::vector<std::string> &keys)
 	Command smembers = Command::smembers(table); // check
 	try
 	{
-		Array result = _redis.execute<Array>(smembers);
+		Redis::Array result = _redis.execute<Redis::Array>(smembers);
 		if(result.isNull())
 		{
 			logger.error("Table %s is Null from Redis", table);
@@ -371,7 +393,7 @@ bool RedisBridge::smembers(std::string table, std::vector<std::string> &keys)
 			keys.clear();
 			for(uint i=0; i< result.size(); i++)
 			{
-				keys.push_back(result.get<BulkString>(i).value());
+				keys.push_back(result.get<Redis::BulkString>(i).value());
 			}
 		}
 	}
@@ -405,7 +427,7 @@ bool RedisBridge::hgetall(std::string table, std::map<std::string, std::string> 
 	Command hgetall = Command::hgetall(table);
 	try
 	{
-		Array result = _redis.execute<Array>(hgetall);
+		Redis::Array result = _redis.execute<Redis::Array>(hgetall);
 		if(result.isNull())
 		{
 			logger.error("Key %s is Null from Redis", table);
@@ -416,7 +438,7 @@ bool RedisBridge::hgetall(std::string table, std::map<std::string, std::string> 
 			logger.information("Total get %u", result.size());
 			for(uint i=0; i< result.size(); i+=2)
 			{
-				fields[result.get<BulkString>(i).value()] = result.get<BulkString>(i+1).value();
+				fields[result.get<Redis::BulkString>(i).value()] = result.get<Redis::BulkString>(i+1).value();
 			}
 			return true;
 		}
@@ -433,7 +455,7 @@ std::string RedisBridge::get(std::string key)
 	std::string value = "";
 	try
 	{
-		BulkString result = _redis.execute<BulkString>(Command::get(key));
+		Redis::BulkString result = _redis.execute<Redis::BulkString>(Command::get(key));
 		if(result.isNull())
 		{
 			logger.error("Key %s is Null from Redis", key);
@@ -485,45 +507,6 @@ MyBridge::MyBridge(): logger(Logger::get("MyBridge")), CONNECTION_STRING("host=1
 
 MyBridge::~MyBridge(){
 
-}
-
-bool MyBridge::QueryLast(int &id)
-{
-	try
-	{
-		Poco::Data::MySQL::Connector::registerConnector();
-		Session session("MySQL", CONNECTION_STRING);
-		if(session.isConnected())
-		{
-			Statement query(session);
-
-			query << "SELECT ID FROM MO_NIA_10 ORDER BY ID DESC LIMIT 1";
-
-			logger.information(query.toString());
-			query.execute();
-			RecordSet rs(query);
-			if(rs.moveFirst())
-			{
-				id = rs[0].convert<int>();
-				return true;
-			}
-			else
-			{
-				logger.warning("Query empty result");
-				return false;
-			}
-		}
-		else
-		{
-			logger.error("MySQL database not connected");
-			return false;
-		}
-	}
-	catch (Exception& e)
-	{
-		logger.error(e.displayText());
-		return false;
-	}
 }
 
 bool MyBridge::InsertMO(std::map<std::string, std::string> detailMO)
@@ -613,31 +596,133 @@ void MyBridge::handleAlarm(AlarmNotification* pNf)
 	}
 	pNf->release();
 }
+
+//----------------------------------------------------------------------------------------------//
+ArangoBridge::ArangoBridge(std::string _host, int _port, std::string _database):
+logger(Logger::get("ArangoBridge")), token(""), database(_database)
+{
+	session = new HTTPClientSession(_host, _port); //建立HTTP session
+	TokenTimer = new Timer(0, 1000 * 60 * 60); //初始化Timer，每小時更新一次token
+	TokenTimer->start(TimerCallback<ArangoBridge>(*this, &ArangoBridge::getToken));
+}
+
+ArangoBridge::~ArangoBridge(){}
+
+JSON::Object::Ptr ArangoBridge::Bridge(std::string method, std::string path, JSON::Object paylod)
+{
+	HTTPRequest request(method, path, HTTPMessage::HTTP_1_1);
+	request.add("Authorization", token);
+	request.setContentType("application/json");
+	std::stringstream ss;
+	paylod.stringify(ss);
+	request.setContentLength(ss.str().size());
+
+	std::ostream& BodyOstream = session->sendRequest(request); // sends request, returns open stream
+	paylod.stringify(BodyOstream);
+
+	HTTPResponse response;
+	istream& rs = session->receiveResponse(response);
+	string s((istreambuf_iterator<char>(rs)), istreambuf_iterator<char>());
+	JSON::Parser parser;
+	return parser.parse(s).extract<JSON::Object::Ptr>();
+}
+
+void ArangoBridge::getToken(Timer& timer)
+{
+	try
+	{
+		JSON::Object paylod;
+		paylod.set("username", "root");
+		paylod.set("password", "root");
+		JSON::Object::Ptr ret = Bridge(HTTPRequest::HTTP_POST, "/_open/auth", paylod);
+		token = "Bearer " + ret->get("jwt").convert<std::string>();
+	}
+    catch (Exception &e)
+    {
+        logger.error(e.displayText());
+    }
+}
+
 //----------------------------------------------------------------------------------------------//
 
-LocalBridge::LocalBridge(AutoPtr<AbstractConfiguration> _config): logger(Logger::get("LocalBridge")), config(_config), DB("storage.db")
+LocalBridge::LocalBridge(AutoPtr<AbstractConfiguration> _config):
+logger(Logger::get("LocalBridge")), config(_config), DB("storage.db")
 {
 	db_path = new Path (config->getString("application.dir"), Path::PATH_UNIX);
 	db_path->setFileName(DB);
 	SQLite::Connector::registerConnector();
-	Session session("SQLite", db_path->toString());
-	File f(*db_path);
-	if(!f.exists())
+	try
 	{
+		Session session("SQLite", db_path->toString());
 	    session << "CREATE TABLE ERROR( ID INTEGER PRIMARY KEY AUTOINCREMENT,"
-	    "DATETIME TIMESTAMP DEFAULT (datetime('now','localtime')), MESSAGE TEXT NOT NULL, DEVICE TEXT NULL)", now;
+	    "DATETIME TIMESTAMP DEFAULT (datetime('now','localtime')), MESSAGE TEXT NOT NULL, DEVICE TEXT NULL, STATUS BOOL NOT NULL)", now;
 	    logger.information("建立異常履歷資料表成功");
+	    session << "CREATE TABLE MO( ID INTEGER PRIMARY KEY AUTOINCREMENT, "
+	    "STARTDATETIME TIMESTAMP DEFAULT (datetime('now','localtime')), ENDDATETIME TIMESTAMP DEFAULT (datetime('now','localtime')),"
+	    "LOTNO VARCHAR NOT NULL, PARTNO VARCHAR NOT NULL, RANDOMSTRING VARCHAR NOT NULL, SOURCE VARCHAR NOT NULL)", now;
+	    logger.information("建立生產履歷資料表成功");
 	}
+    catch (Exception &e)
+    {
+        logger.error(e.displayText());
+    }
 }
 
 LocalBridge::~LocalBridge(){}
 
-bool LocalBridge::insertERROR(ERRORmessage message)
+bool LocalBridge::insertMO(recipe rcp)
 {
 	SQLite::Connector::registerConnector();
 	Session session("SQLite", db_path->toString());
 	Statement insert(session);
-    insert << "INSERT INTO ERROR(MESSAGE, DEVICE) VALUES(?, ?)", use(message.message), use(message.device);
+    insert << "INSERT INTO MO(LOTNO, PARTNO, RANDOMSTRING, SOURCE) VALUES(?, ?, ?, ?)"
+    		 , use(rcp.LOTNO), use(rcp.PARTNO), use(rcp.RANDOMSTRING), use(rcp.SOURCE);
+    logger.information(insert.toString());
+    insert.execute();
+    return true;
+}
+
+bool LocalBridge::updateMO()
+{
+	LocalDateTime now;
+	SQLite::Connector::registerConnector();
+	Session session("SQLite", db_path->toString());
+	Statement update(session);
+	update << "UPDATE MO set ENDDATETIME = '"+ DateTimeFormatter::format(now, "%Y-%m-%d %H:%M:%S")
+	+"' WHERE ID = (SELECT MAX(id) FROM MO )";
+    logger.information(update.toString());
+    update.execute();
+    return true;
+}
+
+bool LocalBridge::getMO(std::vector<recipe> &MOs)
+{
+	MOs.clear();
+	SQLite::Connector::registerConnector();
+	Session session("SQLite", db_path->toString());
+	recipe rcp;
+	Statement select(session);
+    select << "SELECT STARTDATETIME, ENDDATETIME, LOTNO, PARTNO, RANDOMSTRING, SOURCE FROM MO ORDER by ID DESC",
+    		into(rcp.STARTDATETIME), into(rcp.ENDDATETIME), into(rcp.LOTNO), into(rcp.PARTNO), into(rcp.RANDOMSTRING),
+			into(rcp.SOURCE), range(0, 1);
+    while (!select.done())
+    {
+        select.execute();
+        MOs.push_back(rcp);
+    }
+    return true;
+}
+
+bool LocalBridge::insertERROR(std::string message, std::string device, bool status)
+{
+	ERRORmessage Message;
+	Message.message = message;
+	Message.device = device;
+	Message.status = status;
+	SQLite::Connector::registerConnector();
+	Session session("SQLite", db_path->toString());
+	Statement insert(session);
+    insert << "INSERT INTO ERROR(MESSAGE, DEVICE, STATUS) VALUES(?, ?, ?)", use(Message.message), use(Message.device), use(Message.status);
     insert.execute();
     return true;
 }
@@ -649,8 +734,8 @@ bool LocalBridge::getERROR(std::vector<ERRORmessage> &msg)
 	Session session("SQLite", db_path->toString());
 	ERRORmessage Emsg;
 	Statement select(session);
-    select << "SELECT DATETIME, MESSAGE, DEVICE FROM ERROR", into(Emsg.datetime), into(Emsg.message), into(Emsg.device), range(0, 1);
-
+    select << "SELECT DATETIME, MESSAGE, DEVICE, STATUS FROM ERROR ORDER by ID DESC", into(Emsg.datetime),
+    		into(Emsg.message), into(Emsg.device), into(Emsg.status), range(0, 1);
     while (!select.done())
     {
         select.execute();

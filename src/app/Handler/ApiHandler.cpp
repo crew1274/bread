@@ -133,8 +133,45 @@ void ApiHandler::handleRequest(HTTPServerRequest& request, HTTPServerResponse& r
 				throw ApplicationException("查無["+ReciveObject->get("no").convert<std::string>()+"]板厚資訊");
 			}
 		}
+		else if(PathSegments[1] == "VCP_10" && PathSegments[2] == "prod_1" && request.getMethod() == HTTPRequest::HTTP_POST)
+		{
+			logger.information("Prod => Stage1");
+			ReciveObject = parser.parse(s).extract<Object::Ptr>();
+			if(!ReciveObject->has("LotNO") || !ReciveObject->has("Operator") || !ReciveObject->has("ProcSeq"))
+			{
+				throw ApplicationException("參數缺少");
+			}
+			std::string LotNO = ReciveObject->get("LotNO").convert<std::string>();
+			std::string Operator = ReciveObject->get("Operator").convert<std::string>();
+			std::string ProcSeq = ReciveObject->get("ProcSeq").convert<std::string>();
+			logger.information("LotNO:%s, Operator:%s, ProcSeq:%s", LotNO, Operator, ProcSeq);
+			//return
+			std::string target = "鍍銅";
+			std::string payload;
+			if(!RecipeRequest(LotNO, ProcSeq, payload)) //取得參數
+			{
+				throw ApplicationException("請求製程參數錯誤");
+			}
+			logger.debug("請求製程參數完成!");
+			if(!ParseXML(payload, MainObject)) //取得製程序以及批號
+			{
+				throw ApplicationException("無法確認為鍍銅站製程參數，請確認批號或是製程序是否正確");
+			}
+			logger.information("%s製程參數確認為鍍銅站參數", LotNO);
+
+			float RD05M136;
+			std::string itemno = MainObject.get("itemno").convert<std::string>();
+			std::string itemver = MainObject.get("itemver").convert<std::string>();
+			std::string mfver = MainObject.get("mfver").convert<std::string>();
+			if(prod->mb->getRD05M136(itemno, itemver, mfver, RD05M136))
+			{
+				MainObject.set("RD05M136", RD05M136);
+			}
+			logger.information("確認板厚資訊:%hf", RD05M136);
+		}
 		else if(PathSegments[1] == "checkPPR" && request.getMethod() == HTTPRequest::HTTP_GET)
 		{
+			/*取得PPR.json資訊*/
 			checkPPR(ReciveArray);
 			MainObject.set("result", ReciveArray);
 		}
@@ -186,7 +223,6 @@ void ApiHandler::handleRequest(HTTPServerRequest& request, HTTPServerResponse& r
 					logger.information("請求寫入暫存區");
 					MainObject.set("response", prod->ReadyProd(ReciveObject));
 				}
-
 			}
 			else if(PathSegments[2] == "prod" && request.getMethod() == HTTPRequest::HTTP_POST)	//啟動自動模式
 			{
@@ -206,11 +242,74 @@ void ApiHandler::handleRequest(HTTPServerRequest& request, HTTPServerResponse& r
 				MainObject.set("response", true);
 			}
 		}
-		else if(PathSegments[1] == "RFID" && request.getMethod() == HTTPRequest::HTTP_GET)
+		else if(PathSegments[1] == "error")
 		{
-			Object inner;
-			inner.set("Operator", "171104");
-			prod->theEvent(this, inner);
+			std::vector<ERRORmessage> msg;
+			prod->lb->getERROR(msg);
+			JSON::Array result;
+			for(uint i=0; i<msg.size(); i++)
+			{
+				JSON::Object temp;
+				temp.set("datetime", msg[i].datetime);
+				temp.set("message", msg[i].message);
+				temp.set("device", msg[i].device);
+				temp.set("status", msg[i].status);
+				result.add(temp);
+			}
+			MainObject.set("result", result);
+		}
+		else if(PathSegments[1] == "mo_all")
+		{
+			//查詢全資料
+			std::vector<recipe> MOs;
+			prod->lb->getMO(MOs);
+			JSON::Array result;
+			for(uint i=0; i<MOs.size(); i++)
+			{
+				JSON::Object temp;
+				temp.set("STARTDATETIME", MOs[i].STARTDATETIME);
+				temp.set("ENDDATETIME", MOs[i].ENDDATETIME);
+				temp.set("LOTNO", MOs[i].LOTNO);
+				temp.set("PARTNO", MOs[i].PARTNO);
+				temp.set("RANDOMSTRING", MOs[i].RANDOMSTRING);
+				temp.set("SOURCE", MOs[i].SOURCE);
+				temp.set("detail", getDetail(MOs[i].RANDOMSTRING));
+				result.add(temp);
+			}
+			MainObject.set("result", result);
+		}
+		else if(PathSegments[1] == "mo")
+		{
+			if(PathSegments.size() == 2)
+			{
+				std::vector<recipe> MOs;
+				prod->lb->getMO(MOs);
+				JSON::Array result;
+				for(uint i=0; i<MOs.size(); i++)
+				{
+					JSON::Object temp;
+					temp.set("STARTDATETIME", MOs[i].STARTDATETIME);
+					temp.set("ENDDATETIME", MOs[i].ENDDATETIME);
+					temp.set("LOTNO", MOs[i].LOTNO);
+					temp.set("PARTNO", MOs[i].PARTNO);
+					temp.set("RANDOMSTRING", MOs[i].RANDOMSTRING);
+					temp.set("SOURCE", MOs[i].SOURCE);
+					result.add(temp);
+				}
+				MainObject.set("result", result);
+			}
+			else if(PathSegments.size() == 3)
+			{
+				MainObject.set("result", getDetail(PathSegments[2]));
+			}
+		}
+		else if(PathSegments[1] == "test" && PathSegments[2] == "insertHistory")
+		{
+			prod->insertHistory();
+		}
+		else if(PathSegments[1] == "test" && PathSegments[2] == "updateHistory")
+		{
+			prod->lb->updateMO();
 		}
 		else if(PathSegments[1] == "RFID" && request.getMethod() == HTTPRequest::HTTP_POST)
 		{
@@ -260,13 +359,178 @@ void ApiHandler::handleRequest(HTTPServerRequest& request, HTTPServerResponse& r
 	return;
 }
 
+JSON::Object::Ptr ApiHandler::getDetail(std::string RANDOMSTRING)
+{
+	JSON::Object::Ptr resultObject;
+	JSON::Object temp;
+	resultObject = prod->ab->Bridge(HTTPRequest::HTTP_GET,
+			"/_db/VCP-30/_api/document/History/"+RANDOMSTRING, temp);
+	if(resultObject->has("error"))
+	{
+		logger.error(resultObject->get("errorMessage").convert<std::string>());
+		Path ProdFile(prod->config->getString("application.dir"), Path::PATH_UNIX);
+		ProdFile.pushDirectory("history");
+		ProdFile.setFileName(RANDOMSTRING+".json");
+		File targetFile(ProdFile);
+		std::ostringstream ostr;
+		if(!targetFile.exists())
+		{
+			throw ApplicationException("無 "+RANDOMSTRING+".json");
+		}
+		FileInputStream fis(ProdFile.toString());
+		StreamCopier::copyStream(fis, ostr);
+		Parser file_parser;
+		resultObject = file_parser.parse(ostr.str()).extract<JSON::Object::Ptr>();
+	}
+	return resultObject;
+}
+
+bool ApiHandler::RecipeRequest(std::string LotNO, std::string ProcSeq, std::string& response)
+{
+	try
+    {
+        URI url("http://10.11.0.139/mesws_chpt/wsmes/wsmes.asmx/GetParameter");
+        HTTPClientSession session(url.getHost(), url.getPort());
+        string path(url.getPathAndQuery());
+        if (path.empty())
+		{
+        	path = "/";
+		}
+        HTTPRequest req(HTTPRequest::HTTP_POST, path, HTTPMessage::HTTP_1_1);
+        req.setContentType("application/x-www-form-urlencoded;charset=utf-8");
+        HTMLForm form;
+        form.add("InXml", "<?xml version='1.0' encoding='utf-8'?><mfdata><lotdata><no>"
+        		+ LotNO +"</no><itemno></itemno><itemver></itemver><mfver></mfver><procseq>"
+				+ ProcSeq +"</procseq></lotdata><procdata></procdata><exception></exception></mfdata>");
+        form.prepareSubmit(req);
+        form.write(session.sendRequest(req));
+        HTTPResponse res;
+        istream &is = session.receiveResponse(res);
+        StreamCopier::copyToString(is, response);
+        return true;
+    }
+    catch (Exception &e)
+    {
+        logger.error(e.displayText());
+    }
+    return false;
+}
+
+bool ApiHandler::ParseXML(std::string payload, JSON::Object& rs)
+{
+	logger.debug("Ready for parse XML");
+	try
+	{
+		DOMParser parser;
+		AutoPtr<Document> pDoc = parser.parseString(payload);
+
+		NodeIterator it(pDoc, NodeFilter::SHOW_ALL);
+		Node* pNode = it.nextNode();
+		pNode = it.nextNode();
+		pNode = it.nextNode();
+
+		//拆解第二層XML;
+		bool header = true;
+		int count = 0;
+		DOMParser parser_1;
+		AutoPtr<Document> pDoc_1 = parser_1.parseString(pNode->nodeValue());
+		NodeIterator it_1(pDoc_1, NodeFilter::SHOW_ALL);
+		Node* pNode_1 = it_1.nextNode();
+		while (pNode_1)
+		{
+			if(pNode_1->nodeName() == "procdata")
+			{
+				header = false;
+			}
+			if(header)
+			{
+				if(pNode_1->nodeName() == "itemno") /*尋找料號*/
+				{
+					pNode_1 = it_1.nextNode();
+					rs.set("itemno", pNode_1->nodeValue());
+					logger.information("Find itemno = %s", rs.get("itemno").convert<std::string>());
+				}
+				else if(pNode_1->nodeName() == "itemver")
+				{
+					pNode_1 = it_1.nextNode();
+					rs.set("itemver", pNode_1->nodeValue());
+					logger.information("Find itemver = %s", rs.get("itemver").convert<std::string>());
+				}
+				else if(pNode_1->nodeName() == "mfver")
+				{
+					pNode_1 = it_1.nextNode();
+					rs.set("mfver", pNode_1->nodeValue());
+					logger.information("Find mfver = %s", rs.get("mfver").convert<std::string>());
+				}
+			}
+			else
+			{
+
+				if(pNode_1->getNodeValue() == "RD05M47")
+				{
+					pNode_1 = it_1.nextNode();
+					pNode_1 = it_1.nextNode();
+					rs.set("RD05M47", pNode_1->nodeValue());
+					logger.information("Extract RD05M47:%s", rs.get("RD05M47").convert<std::string>());
+					count++;
+				}
+				else if(pNode_1->getNodeValue() == "RD05M134")
+				{
+					pNode_1 = it_1.nextNode();
+					pNode_1 = it_1.nextNode();
+					rs.set("RD05M134", pNode_1->nodeValue());
+					logger.information("Extract RD05M47:%s", rs.get("RD05M134").convert<std::string>());
+					count++;
+				}
+				else if(pNode_1->getNodeValue() == "RD05M145")
+				{
+					pNode_1 = it_1.nextNode();
+					pNode_1 = it_1.nextNode();
+					rs.set("RD05M145", pNode_1->nodeValue());
+					logger.information("Extract RD05M145:%s", rs.get("RD05M145").convert<std::string>());
+					count++;
+				}
+				else if(pNode_1->getNodeValue() == "RD05M146")
+				{
+					pNode_1 = it_1.nextNode();
+					pNode_1 = it_1.nextNode();
+					rs.set("RD05M146", pNode_1->nodeValue());
+					logger.information("Extract RD05M146:%s", rs.get("RD05M146").convert<std::string>());
+					count++;
+				}
+				else if(pNode_1->getNodeValue() == "RD05M49")
+				{
+					pNode_1 = it_1.nextNode();
+					pNode_1 = it_1.nextNode();
+					rs.set("RD05M49", pNode_1->nodeValue());
+					logger.information("Extract RD05M49:%s", rs.get("RD05M49").convert<std::string>());
+					count++;
+				}
+			}
+			pNode_1 = it_1.nextNode();
+		}
+		if(count>=4)
+		{
+			return true;
+		}
+		else
+		{
+			throw ApplicationException("無法確認為鍍銅站製程參數");
+		}
+	}
+	catch (Exception& e)
+	{
+		logger.error(e.displayText());
+	}
+	return false;
+}
+
 Object ApiHandler::ProdCheck()
 {
 	Object obj;
-	obj.set("EDGE", prod->isFine);
 //	prod->RFID_ret != -1? obj.set("RFID", true): obj.set("RFID", false);
 //	obj.set("PLC", prod->plc->ret);
 	std::string res;
-	obj.set("MES", prod->RecipeRequest("", "", res));
+//	obj.set("MES", prod->RecipeRequest("", "", res));
 	return obj;
 }

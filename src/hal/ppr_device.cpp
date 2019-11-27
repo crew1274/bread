@@ -34,9 +34,9 @@ void PPRDEVICE::Shutdown()
 }
 
 
-int PPRDEVICE::ppr_actual_status(int slave_id){
-// 整合所有狀態
-
+int PPRDEVICE::ppr_actual_status(int slave_id)
+{
+	// 整合所有狀態
 	uint16_t buffer[1];
 	memset(buffer,0,sizeof(buffer));
 	if(modbus::modbus_read_input_registers(slave_id,2, 1, buffer)==false){
@@ -74,63 +74,78 @@ int PPRDEVICE::ppr_actual_status(int slave_id){
 	return buffer[0];
 }
 
-int PPRDEVICE::ppr_actual_messages1(int slave_id){
-// 整合所有狀態
-
+int PPRDEVICE::ppr_actual_messages1(int slave_id)
+{
+	// 整合所有狀態
 	uint16_t buffer[1];
 	memset(buffer,0,sizeof(buffer));
-	if(modbus::modbus_read_input_registers(slave_id, 5, 1, buffer)==false){
-		cout << "ppr_actual_messages1 (modbus error)" << endl;
-		return 65535;
+	if(modbus::modbus_read_input_registers(slave_id, 5, 1, buffer)==false)
+	{
+		throw IOException("ppr_actual_messages1 (modbus error)");
 	}
-
-	if((buffer[0] & 0x01) == 0x01){
-		cout << "Warning over current due to effective." << endl;
+	if((buffer[0] & 0x01) == 0x01)
+	{
+		throw IOException("Warning over current due to effective.");
 	}
-	if(((buffer[0] >> 1) & 0x01) == 0x01){
-		cout << "Warning over voltage due to effective." << endl;
+	if(((buffer[0] >> 1) & 0x01) == 0x01)
+	{
+		throw IOException("Warning over voltage due to effective.");
 	}
-	if(((buffer[0] >> 2) & 0x01) == 0x01){
-		cout << "Warning over power due to average." << endl;
+	if(((buffer[0] >> 2) & 0x01) == 0x01)
+	{
+		throw IOException("Warning over power due to average.");
 	}
-	if(((buffer[0] >> 3) & 0x01) == 0x01){
-		cout << "Warning temperature." << endl;
+	if(((buffer[0] >> 3) & 0x01) == 0x01)
+	{
+		throw IOException("Warning temperature.");
 	}
-	if(((buffer[0] >> 4) & 0x01) == 0x01){
-		cout << "Error:Over current switch off due to effective or peak(with switch off)." << endl;
+	if(((buffer[0] >> 4) & 0x01) == 0x01)
+	{
+		throw IOException("Error:Over current switch off due to effective or peak(with switch off).");
 	}
-	if(((buffer[0] >> 5) & 0x01) == 0x01){
-		cout << "Error:Over voltage switch off due to effective value." << endl;
+	if(((buffer[0] >> 5) & 0x01) == 0x01)
+	{
+		throw IOException("Error:Over voltage switch off due to effective value.");
 	}
-	if(((buffer[0] >> 6) & 0x01) == 0x01){
-		cout << "Error:Over power switch off due to average value." << endl;
+	if(((buffer[0] >> 6) & 0x01) == 0x01)
+	{
+		throw IOException("Error:Over power switch off due to average value.");
 	}
-	if(((buffer[0] >> 7) & 0x01) == 0x01){
-		cout << "Error:Temperature switch off due to high temperature." << endl;
+	if(((buffer[0] >> 7) & 0x01) == 0x01)
+	{
+		throw IOException("Error:Temperature switch off due to high temperature.");
 	}
-	if(((buffer[0] >> 8) & 0x01) == 0x01){
-		cout << "Intermediate circuit voltage too low." << endl;
+	if(((buffer[0] >> 8) & 0x01) == 0x01)
+	{
+		throw IOException("Intermediate circuit voltage too low.");
 	}
-	if(((buffer[0] >> 9) & 0x01) == 0x01){
-		cout << "Intermediate circuit voltage too high." << endl;
+	if(((buffer[0] >> 9) & 0x01) == 0x01)
+	{
+		throw IOException("Intermediate circuit voltage too high.");
 	}
-	if(((buffer[0] >> 10) & 0x01) == 0x01){
-		cout << "Error voltage supply DSP board." << endl;
+	if(((buffer[0] >> 10) & 0x01) == 0x01)
+	{
+		throw IOException("Error voltage supply DSP board.");
 	}
-	if(((buffer[0] >> 11) & 0x01) == 0x01){
-		cout << "At least 1 MPP defective." << endl;
+	if(((buffer[0] >> 11) & 0x01) == 0x01)
+	{
+		throw IOException("At least 1 MPP defective.");
 	}
-	if(((buffer[0] >> 12) & 0x01) == 0x01){
-		cout << "Error period start." << endl;
+	if(((buffer[0] >> 12) & 0x01) == 0x01)
+	{
+		throw IOException("Error period start.");
 	}
-	if(((buffer[0] >> 13) & 0x01) == 0x01){
-		cout << "Temperature measurement unit is defective." << endl;
+	if(((buffer[0] >> 13) & 0x01) == 0x01)
+	{
+		throw IOException("Temperature measurement unit is defective.");
 	}
-	if(((buffer[0] >> 14) & 0x01) == 0x01){
-		cout << "Magnetic valve off." << endl;
+	if(((buffer[0] >> 14) & 0x01) == 0x01)
+	{
+		throw IOException("Magnetic valve off.");
 	}
-	if(((buffer[0] >> 15) & 0x01) == 0x01){
-		cout << "Parallel PRPS off." << endl;
+	if(((buffer[0] >> 15) & 0x01) == 0x01)
+	{
+		throw IOException("Parallel PRPS off.");
 	}
 	return buffer[0];
 }
@@ -140,7 +155,8 @@ int PPRDEVICE::ppr_actual_messages2(int slave_id){
 
 	uint16_t buffer[1];
 	memset(buffer,0,sizeof(buffer));
-	if(modbus::modbus_read_input_registers(slave_id, 6, 1, buffer)==false){
+	if(modbus::modbus_read_input_registers(slave_id, 6, 1, buffer)==false)
+	{
 		cout << "ppr_actual_messages2 (modbus error)" << endl;
 		return 65535;
 	}
@@ -396,7 +412,7 @@ int PPRDEVICE::waveform_set(int slave_id, int regulator, std::vector<PPR_Wavefor
 	regulator = regulator * 100;
 	if(modbus::modbus_write_register(slave_id, 1, unsigned(regulator)) == false)
 	{
-		cout << "waveform_set (modbus error)" << endl;
+		cout << "waveform_set - regulator(modbus error)" << endl;
 		mutex.unlock();
 		return 65535;
 	}
@@ -452,37 +468,37 @@ int PPRDEVICE::waveform_set(int slave_id, int regulator, std::vector<PPR_Wavefor
 	for (uint ii = PPR_Table.size(); ii < PPR_Table.size()+1; ii++)
 	{
 		if(modbus::modbus_write_register(slave_id, ii*7 + 2, 0)==false){
-			cout << "waveform_set (modbus error)" << endl;
+			cout << "waveform_set 0 -  Ix1(modbus error)" << endl;
 			mutex.unlock();
 			return 65535;
 		}
 		if(modbus::modbus_write_register(slave_id, ii*7 + 3, 0)==false){
-			cout << "waveform_set (modbus error)" << endl;
+			cout << "waveform_set 0 - Ix2(modbus error)" << endl;
 			mutex.unlock();
 			return 65535;
 		}
 		if(modbus::modbus_write_register(slave_id, ii*7 + 4, 0)==false){
-			cout << "waveform_set (modbus error)" << endl;
+			cout << "waveform_set 0 - Ux1(modbus error)" << endl;
 			mutex.unlock();
 			return 65535;
 		}
 		if(modbus::modbus_write_register(slave_id, ii*7 + 5, 0)==false){
-			cout << "waveform_set (modbus error)" << endl;
+			cout << "waveform_set 0 - Ux2(modbus error)" << endl;
 			mutex.unlock();
 			return 65535;
 		}
 		if(modbus::modbus_write_register(slave_id, ii*7 + 6, 0)==false){
-			cout << "waveform_set (modbus error)" << endl;
+			cout << "waveform_set 0 - Tx1(modbus error)" << endl;
 			mutex.unlock();
 			return 65535;
 		}
 		if(modbus::modbus_write_register(slave_id, ii*7 + 7, 0)==false){
-			cout << "waveform_set (modbus error)" << endl;
+			cout << "waveform_set 0 - Tx2(modbus error)" << endl;
 			mutex.unlock();
 			return 65535;
 		}
 		if(modbus::modbus_write_register(slave_id, ii*7 + 8, 0)==false){
-			cout << "waveform_set (modbus error)" << endl;
+			cout << "waveform_set 0 - Cycle(modbus error)" << endl;
 			mutex.unlock();
 			return 65535;
 		}

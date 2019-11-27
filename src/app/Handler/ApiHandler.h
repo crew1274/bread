@@ -128,6 +128,7 @@
 #include "Poco/Message.h"
 #include "Poco/Exception.h"
 #include "Poco/File.h"
+#include "Poco/JSON/Parser.h"
 
 #include "app/PLC.h"
 #include "app/Prod.h"
@@ -149,7 +150,10 @@ public:
 	void storePPR(std::string recipes);
 	bool checkPPR(JSON::Array::Ptr& ReciveArray);
 	JSON::Object ProdCheck();
+	bool RecipeRequest(std::string LotNO, std::string ProcSeq, std::string& response);
+	bool ParseXML(std::string payload, JSON::Object& rs);
 	void handleRequest(HTTPServerRequest& request, HTTPServerResponse& response);
+	JSON::Object::Ptr getDetail(std::string RANDOMSTRING);
 private:
 	Logger& logger;
 	Prod* prod;
