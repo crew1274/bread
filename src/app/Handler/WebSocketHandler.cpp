@@ -130,7 +130,7 @@ bool WebSocketHandler::AuthCheck(std::string payload)
 	return false;
 }
 
-void WebSocketHandler::onEvent(const void* pSender, Object& inner)
+void WebSocketHandler::onEvent(const void* pSender, Object& inner) /*覆加訊息拆解*/
 {
 	for(Object::Iterator it = inner.begin(); it!= inner.end(); it++)
 	{

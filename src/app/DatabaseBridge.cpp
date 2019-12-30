@@ -613,9 +613,12 @@ JSON::Object::Ptr ArangoBridge::Bridge(std::string method, std::string path, JSO
 	HTTPRequest request(method, path, HTTPMessage::HTTP_1_1);
 	request.add("Authorization", token);
 	request.setContentType("application/json");
-	std::stringstream ss;
-	paylod.stringify(ss);
-	request.setContentLength(ss.str().size());
+	if(method != "HTTP_POST")
+	{
+		std::stringstream ss;
+		paylod.stringify(ss);
+		request.setContentLength(ss.str().size());
+	}
 
 	std::ostream& BodyOstream = session->sendRequest(request); // sends request, returns open stream
 	paylod.stringify(BodyOstream);
@@ -651,15 +654,32 @@ logger(Logger::get("LocalBridge")), config(_config), DB("storage.db")
 	db_path = new Path (config->getString("application.dir"), Path::PATH_UNIX);
 	db_path->setFileName(DB);
 	SQLite::Connector::registerConnector();
+	Session session("SQLite", db_path->toString());
 	try
 	{
-		Session session("SQLite", db_path->toString());
+	    session << "CREATE TABLE POTION( ID INTEGER PRIMARY KEY AUTOINCREMENT,"
+	    "DATETIME TIMESTAMP DEFAULT (datetime('now','localtime')), POTION TEXT NOT NULL, ACTION TEXT NOT NULL)", now;
+	    logger.information("建立自動添加記錄資料表成功");
+	}
+	catch (Exception &e)
+	{
+		logger.error(e.displayText());
+	}
+	try
+	{
 	    session << "CREATE TABLE ERROR( ID INTEGER PRIMARY KEY AUTOINCREMENT,"
 	    "DATETIME TIMESTAMP DEFAULT (datetime('now','localtime')), MESSAGE TEXT NOT NULL, DEVICE TEXT NULL, STATUS BOOL NOT NULL)", now;
 	    logger.information("建立異常履歷資料表成功");
+	}
+	catch (Exception &e)
+	{
+		logger.error(e.displayText());
+	}
+	try
+	{
 	    session << "CREATE TABLE MO( ID INTEGER PRIMARY KEY AUTOINCREMENT, "
 	    "STARTDATETIME TIMESTAMP DEFAULT (datetime('now','localtime')), ENDDATETIME TIMESTAMP DEFAULT (datetime('now','localtime')),"
-	    "LOTNO VARCHAR NOT NULL, PARTNO VARCHAR NOT NULL, RANDOMSTRING VARCHAR NOT NULL, SOURCE VARCHAR NOT NULL)", now;
+	    "LOTNO VARCHAR NOT NULL, PARTNO VARCHAR NOT NULL, RANDOMSTRING VARCHAR NOT NULL, SOURCE VARCHAR NOT NULL, PPR_or_DC VARCHAR NOT NULL)", now;
 	    logger.information("建立生產履歷資料表成功");
 	}
     catch (Exception &e)
@@ -675,8 +695,8 @@ bool LocalBridge::insertMO(recipe rcp)
 	SQLite::Connector::registerConnector();
 	Session session("SQLite", db_path->toString());
 	Statement insert(session);
-    insert << "INSERT INTO MO(LOTNO, PARTNO, RANDOMSTRING, SOURCE) VALUES(?, ?, ?, ?)"
-    		 , use(rcp.LOTNO), use(rcp.PARTNO), use(rcp.RANDOMSTRING), use(rcp.SOURCE);
+    insert << "INSERT INTO MO(LOTNO, PARTNO, RANDOMSTRING, SOURCE, PPR_or_DC) VALUES(?, ?, ?, ?, ?)"
+    		 , use(rcp.LOTNO), use(rcp.PARTNO), use(rcp.RANDOMSTRING), use(rcp.SOURCE), use(rcp.PPR_or_DC);
     logger.information(insert.toString());
     insert.execute();
     return true;
@@ -702,13 +722,43 @@ bool LocalBridge::getMO(std::vector<recipe> &MOs)
 	Session session("SQLite", db_path->toString());
 	recipe rcp;
 	Statement select(session);
-    select << "SELECT STARTDATETIME, ENDDATETIME, LOTNO, PARTNO, RANDOMSTRING, SOURCE FROM MO ORDER by ID DESC",
+    select << "SELECT STARTDATETIME, ENDDATETIME, LOTNO, PARTNO, RANDOMSTRING, SOURCE, PPR_or_DC FROM MO ORDER by ID DESC",
     		into(rcp.STARTDATETIME), into(rcp.ENDDATETIME), into(rcp.LOTNO), into(rcp.PARTNO), into(rcp.RANDOMSTRING),
-			into(rcp.SOURCE), range(0, 1);
+			into(rcp.SOURCE), into(rcp.PPR_or_DC), range(0, 1);
     while (!select.done())
     {
         select.execute();
         MOs.push_back(rcp);
+    }
+    return true;
+}
+
+bool LocalBridge::insertPotion(std::string potion, std::string action)
+{
+	SQLite::Connector::registerConnector();
+	Session session("SQLite", db_path->toString());
+	Statement insert(session);
+	POTIONmessage Pmsg;
+	Pmsg.potion = potion;
+	Pmsg.action = action;
+    insert << "INSERT INTO POTION(POTION, ACTION) VALUES(?, ?)", use(Pmsg.potion), use(Pmsg.action);
+    insert.execute();
+    return true;
+}
+
+bool LocalBridge::getPotion(std::vector<POTIONmessage> &msg)
+{
+	msg.clear();
+	SQLite::Connector::registerConnector();
+	Session session("SQLite", db_path->toString());
+	POTIONmessage Pmsg;
+	Statement select(session);
+    select << "SELECT DATETIME, POTION, ACTION FROM POTION ORDER BY ID DESC", into(Pmsg.datetime),
+    		into(Pmsg.potion), into(Pmsg.action), range(0, 1);
+    while (!select.done())
+    {
+        select.execute();
+        msg.push_back(Pmsg);
     }
     return true;
 }

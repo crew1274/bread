@@ -758,6 +758,7 @@ protected:
 		prod = new Prod(&(config()), RFID, mb, myb, rb, lb, ab, plc, ws);
 		/*加入監聽事件*/
 		nc->addObserver(Observer<Prod, AlarmNotification>(*prod, &Prod::handleAlarm));
+
 	}
 
 	void uninitialize()

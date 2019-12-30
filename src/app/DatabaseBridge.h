@@ -170,7 +170,6 @@
 #include "Poco/Net/HTTPClientSession.h"
 #include "Poco/JSON/Parser.h"
 
-
 #include "def.h"
 
 using namespace std;
@@ -208,19 +207,6 @@ private:
 	const std::string MESSERIES_CONNECTION_STRING;
 protected:
 	std::vector<recipe> Recipes;
-};
-
-class ClientBridge{
-public:
-	ClientBridge(std::string db);
-	virtual ~ClientBridge();
-//	bool Insert(std::string insert);
-//	bool isExist(std::string query);
-private:
-	Logger& logger;
-	Session* session;
-	AutoPtr<IniFileConfiguration> pconfig;
-protected:
 };
 
 class RedisBridge
@@ -293,6 +279,8 @@ public:
 	bool getMO(std::vector<recipe> &MOs);
 	bool insertERROR(std::string message, std::string device, bool status);
 	bool getERROR(std::vector<ERRORmessage> &msg);
+	bool insertPotion(std::string potion, std::string action);
+	bool getPotion(std::vector<POTIONmessage> &msg);
 private:
 	Logger& logger;
 	AutoPtr<AbstractConfiguration> config;

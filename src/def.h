@@ -124,6 +124,13 @@ struct ERRORmessage
 	bool status;
 };
 
+struct POTIONmessage
+{
+	std::string datetime;
+	std::string potion;
+	std::string action;
+};
+
 struct recipe
 {
 	std::string LOTNO;
@@ -132,6 +139,7 @@ struct recipe
 	std::string ENDDATETIME;
 	std::string RANDOMSTRING;
 	std::string SOURCE;
+	std::string PPR_or_DC;
 };
 
 class AlarmNotification: public Notification

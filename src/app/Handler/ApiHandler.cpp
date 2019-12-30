@@ -258,6 +258,21 @@ void ApiHandler::handleRequest(HTTPServerRequest& request, HTTPServerResponse& r
 			}
 			MainObject.set("result", result);
 		}
+		else if(PathSegments[1] == "potion")
+		{
+			std::vector<POTIONmessage> msg;
+			prod->lb->getPotion(msg);
+			JSON::Array result;
+			for(uint i=0; i<msg.size(); i++)
+			{
+				JSON::Object temp;
+				temp.set("datetime", msg[i].datetime);
+				temp.set("potion", msg[i].potion);
+				temp.set("action", msg[i].action);
+				result.add(temp);
+			}
+			MainObject.set("result", result);
+		}
 		else if(PathSegments[1] == "mo_all")
 		{
 			//查詢全資料
@@ -273,6 +288,7 @@ void ApiHandler::handleRequest(HTTPServerRequest& request, HTTPServerResponse& r
 				temp.set("PARTNO", MOs[i].PARTNO);
 				temp.set("RANDOMSTRING", MOs[i].RANDOMSTRING);
 				temp.set("SOURCE", MOs[i].SOURCE);
+				temp.set("PPR_or_DC", MOs[i].PPR_or_DC);
 				temp.set("detail", getDetail(MOs[i].RANDOMSTRING));
 				result.add(temp);
 			}
@@ -294,6 +310,7 @@ void ApiHandler::handleRequest(HTTPServerRequest& request, HTTPServerResponse& r
 					temp.set("PARTNO", MOs[i].PARTNO);
 					temp.set("RANDOMSTRING", MOs[i].RANDOMSTRING);
 					temp.set("SOURCE", MOs[i].SOURCE);
+					temp.set("PPR_or_DC", MOs[i].PPR_or_DC);
 					result.add(temp);
 				}
 				MainObject.set("result", result);

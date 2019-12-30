@@ -1,5 +1,5 @@
 /*
- * Prod.cpp
+-	`	++++++++ * Prod.cpp
  *
  *  Created on: 2018年7月19日
  *      Author: 171104
@@ -23,8 +23,9 @@ BreakPoint(false), _ActiveMethod(this, &Prod::toTSDB)
 	PPRstatus = plc->ReadPoint_PLC("DM", 20004, 0, false);
 	logger.information("PPR起始狀態為: %d", PPRstatus);
 	ActiveDetect = false; //回應給PLC
+//	insertHistory();
 //	ppr = new PPRDEVICE(config->getString("DEVICE.PPR").c_str());
-
+//	lb->insertPotion("測試", "測試");
 }
 
 Prod::~Prod()
@@ -889,6 +890,9 @@ void Prod::BackgroundPPR()
 		}
 
 		PPRstatus = plc->ReadPoint_PLC("DM", 20004, 0, false);
+
+		plc->ReadPoint_PLC("DM", 20004, 0, false);
+		plc->ReadPoint_PLC("DM", 20004, 0, false);
 		if(PRE_PPRstatus != 1 && PPRstatus == 1)
 		{
 			//入料
@@ -905,11 +909,25 @@ void Prod::BackgroundPPR()
 			JSON::Object::Ptr result = ab->Bridge(HTTPRequest::HTTP_PUT, "/_db/VCP-30/_api/document/History", ReciveObject);
 			if(result->has("error"))
 			{
-				logger.error("e");
 				logger.error(result->get("errorMessage").convert<std::string>());
 			}
 		}
 		PRE_PPRstatus = PPRstatus;
+
+		/*自動添加系統*/
+
+		C_status = plc->ReadPoint_PLC("CIO", 12, 8, false);
+		if(C_status and ! PRE_C_status) // 0 -> 1
+		{
+			lb->insertPotion("C劑", "PLC自動添加");
+		}
+		PRE_C_status = C_status;
+		D_status = plc->ReadPoint_PLC("CIO", 12, 9, false);
+		if(D_status and ! PRE_D_status) // 0 -> 1
+		{
+			lb->insertPotion("D劑", "PLC自動添加");
+		}
+		PRE_D_status = D_status;
 		Thread::sleep(500);
 	}
 }
@@ -1069,9 +1087,12 @@ void Prod::insertHistory()
 	LocalDateTime now;
 	ReciveObject->set("STARTDATETIME", DateTimeFormatter::format(now, "%Y-%m-%d %H:%M:%S"));
 	JSON::Object::Ptr lotdataObject = ReciveObject->getObject("lotdata");
+	JSON::Object::Ptr ppr_dataObject = ReciveObject->getObject("ppr_data");
+
 	rcp.LOTNO = lotdataObject->get("no").convert<std::string>();
 	rcp.PARTNO = lotdataObject->get("itemno").convert<std::string>();
 	rcp.SOURCE = lotdataObject->get("source").convert<std::string>();
+	rcp.PPR_or_DC = ppr_dataObject->get("PPR_or_DC").convert<std::string>();
 	ProdFile.pushDirectory("history");
 
 	JSON::Object::Ptr result = ab->Bridge(HTTPRequest::HTTP_POST, "/_db/VCP-30/_api/document/History", *ReciveObject);

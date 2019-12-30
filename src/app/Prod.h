@@ -227,6 +227,13 @@ public:
 	bool BreakPoint;
 	int PPRstatus;
 	int PRE_PPRstatus;
+
+	int C_status;
+	int PRE_C_status;
+
+	int D_status;
+	int PRE_D_status;
+
 	std::map<int, std::string> PPRstatusMap;
 	bool ActiveDetect;
     ActiveMethod<void, std::string, Prod> _ActiveMethod;
