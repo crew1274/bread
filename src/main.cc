@@ -696,6 +696,8 @@ protected:
 		{
 			terminate();
 		}
+		std::ofstream fs((config().getString("application.dir")+"/ec.pid").c_str(), std::ofstream::trunc);
+		fs << getpid();
 		// create logger
 		AutoPtr<SplitterChannel> DoubleChannel(new SplitterChannel());
 		Path current(config().getString("application.dir"), Path::PATH_UNIX);

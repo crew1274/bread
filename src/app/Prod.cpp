@@ -890,9 +890,11 @@ void Prod::BackgroundPPR()
 		}
 
 		PPRstatus = plc->ReadPoint_PLC("DM", 20004, 0, false);
+		if(PPRstatus != PRE_PPRstatus)
+		{
+			logger.information("設備狀態: %d -> %d",PRE_PPRstatus, PPRstatus);
+		}
 
-		plc->ReadPoint_PLC("DM", 20004, 0, false);
-		plc->ReadPoint_PLC("DM", 20004, 0, false);
 		if(PRE_PPRstatus != 1 && PPRstatus == 1)
 		{
 			//入料

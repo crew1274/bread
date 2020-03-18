@@ -482,7 +482,6 @@ bool ApiHandler::ParseXML(std::string payload, JSON::Object& rs)
 			}
 			else
 			{
-
 				if(pNode_1->getNodeValue() == "RD05M47")
 				{
 					pNode_1 = it_1.nextNode();

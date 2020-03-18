@@ -90,6 +90,7 @@ void WebSocketHandler::handleRequest(HTTPServerRequest& request, HTTPServerRespo
 	{
 		logger.error(e.displayText());
 	}
+	prod->theEvent -= delegate(this, &WebSocketHandler::onEvent);
 	prod->ProdMutex.unlock();
 	logger.information("WebSocket connection closed");
 	return;
