@@ -819,10 +819,11 @@ protected:
 			logger.information("啟動PLC資料紀錄功能");
 			PLCTimer.start(TimerCallback<PLC>(*plc, &PLC::Base));
 		}
-		RunnableAdapter<Prod> runnableforBackgroundPPR(*prod, &Prod::BackgroundPPR);
+		Timer BackgroundPPRTimer(0, 1000);
+		BackgroundPPRTimer.start(TimerCallback<Prod>(*prod, &Prod::BackgroundPPR));
+
 		RunnableAdapter<Prod> runnableforActiveResponse(*prod, &Prod::ActiveResponse);
 		ThreadPool::defaultPool().start(runnableforActiveResponse);
-		ThreadPool::defaultPool().start(runnableforBackgroundPPR);
 		// set-up a server socket
 		ServerSocket svs(config().getInt("DEVICE.PORT", 9999));
 		// set-up a HTTPServer instance

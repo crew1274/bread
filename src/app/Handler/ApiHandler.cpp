@@ -118,7 +118,6 @@ void ApiHandler::handleRequest(HTTPServerRequest& request, HTTPServerResponse& r
 		}
 		else if(PathSegments[1] == "getRD05M136" && request.getMethod() == HTTPRequest::HTTP_POST)
 		{
-			cout << s << endl;
 			ReciveObject = parser.parse(s).extract<JSON::Object::Ptr>();
 			float RD05M136;
 			std::string itemno = ReciveObject->get("itemno").convert<std::string>();
@@ -208,7 +207,16 @@ void ApiHandler::handleRequest(HTTPServerRequest& request, HTTPServerResponse& r
 		}
 		else if(PathSegments[1] == "prod")
 		{
-			if(PathSegments[2] == "check" && request.getMethod() == HTTPRequest::HTTP_GET)
+			if(request.getMethod() == HTTPRequest::HTTP_GET)
+			{
+				MainObject.set("response", prod->LoadProd());
+			}
+			else if(request.getMethod() == HTTPRequest::HTTP_PUT)
+			{
+				logger.information("請求更新Prod.json");
+				MainObject.set("response", prod->updateProd(parser.parse(s).extract<JSON::Object::Ptr>()));
+			}
+			else if(PathSegments[2] == "check" && request.getMethod() == HTTPRequest::HTTP_GET)
 			{
 				MainObject.set("check", ProdCheck());
 			}
@@ -235,10 +243,23 @@ void ApiHandler::handleRequest(HTTPServerRequest& request, HTTPServerResponse& r
 			logger.information("呼叫AGV");
 			if(prod->config->getBool("DEVICE.ENV"))
 			{
-				MainObject.set("response", prod->CallAGV());
+				if(prod->CallAGV())
+				{
+					MainObject.set("response", true);
+					/*
+					 * 重新更新資料
+					 * */
+					prod->updateProd(parser.parse(s).extract<JSON::Object::Ptr>());
+				}
+				else
+				{
+					MainObject.set("response", false);
+					MainObject.set("message", "叫車失敗");
+				}
 			}
 			else
 			{
+				logger.information("測試環境，不執行叫車");
 				MainObject.set("response", true);
 			}
 		}

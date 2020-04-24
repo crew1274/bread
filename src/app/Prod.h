@@ -197,7 +197,7 @@ public:
 	void forPPR();
 	bool StopPPR();
 	void PPRloop();
-	void BackgroundPPR();
+	void BackgroundPPR(Timer& timer);
 	bool startPPR(int index);
 	void ActiveResponse();
 	bool ReadyProd(JSON::Object::Ptr data);
@@ -207,6 +207,10 @@ public:
 	void insertHistory();
 	void updateHistory();
 	std::string random_string( size_t length );
+
+	JSON::Object::Ptr LoadProd();
+	bool updateProd(JSON::Object::Ptr p);
+
 	//生產使用物件
 	Logger& logger;
 	AutoPtr<AbstractConfiguration> config;

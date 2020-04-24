@@ -692,7 +692,7 @@ bool Prod::CallAGV()
 	std::string res = server_reply;
 	logger.information("AGV Server reply : %s", res);
 
-	if(res == "ExCallCarResponse$")
+	if (res.find("ExCallCarResponse$") != res.npos)
 	{
 		return true;
 	}
@@ -859,79 +859,65 @@ void Prod::ActiveResponse()
 //    return false;
 //}
 
-void Prod::BackgroundPPR()
+void Prod::BackgroundPPR(Timer& timer)
 {
 	int value = 0;
 	std::stringstream payload;
-	while(1)
+	payload.str("");
+	payload << "PPR"; //目標資料表
+	payload << ",status="<< PPRstatusMap[PPRstatus] << " "; //狀態描述
+	value = plc->ReadPoint_PLC("DM", 12303, 0, false);
+	payload << "average_current_1=" << value << ",";
+
+
+	value = plc->ReadPoint_PLC("DM", 12403, 0, false);
+	payload << "average_current_2=" << value << ",";
+
+
+	value = plc->ReadPoint_PLC("DM", 12304, 0, false);
+	payload << "average_voltage_1=" << value << ",";
+
+
+	value = plc->ReadPoint_PLC("DM", 12404, 0, false);
+	payload << "average_voltage_2=" << value;
+
+	if(config->getBool("TSDB.RUN", false))
 	{
-		payload.str("");
-		payload << "PPR"; //目標資料表
-		payload << ",status="<< PPRstatusMap[PPRstatus] << " "; //狀態描述
-		value = plc->ReadPoint_PLC("DM", 12303, 0, false);
-		payload << "average_current_1=" << value << ",";
-
-
-		value = plc->ReadPoint_PLC("DM", 12403, 0, false);
-		payload << "average_current_2=" << value << ",";
-
-
-		value = plc->ReadPoint_PLC("DM", 12304, 0, false);
-		payload << "average_voltage_1=" << value << ",";
-
-
-		value = plc->ReadPoint_PLC("DM", 12404, 0, false);
-		payload << "average_voltage_2=" << value;
-
-		if(config->getBool("TSDB.RUN", false))
-		{
 //			this->_ActiveMethod(payload.str().substr(0, payload.str().size()-1));
-			this->_ActiveMethod(payload.str());
-		}
-
-		PPRstatus = plc->ReadPoint_PLC("DM", 20004, 0, false);
-		if(PPRstatus != PRE_PPRstatus)
-		{
-			logger.information("設備狀態: %d -> %d",PRE_PPRstatus, PPRstatus);
-		}
-
-		if(PRE_PPRstatus != 1 && PPRstatus == 1)
-		{
-			//入料
-			insertHistory();
-		}
-		else if(PRE_PPRstatus == 5 && PPRstatus == 6)
-		{
-			//出料
-			lb->updateMO();
-
-			JSON::Object ReciveObject;
-			LocalDateTime now;
-			ReciveObject.set("ENDDATETIME", DateTimeFormatter::format(now, "%Y-%m-%d %H:%M:%S"));
-			JSON::Object::Ptr result = ab->Bridge(HTTPRequest::HTTP_PUT, "/_db/VCP-30/_api/document/History", ReciveObject);
-			if(result->has("error"))
-			{
-				logger.error(result->get("errorMessage").convert<std::string>());
-			}
-		}
-		PRE_PPRstatus = PPRstatus;
-
-		/*自動添加系統*/
-
-		C_status = plc->ReadPoint_PLC("CIO", 12, 8, false);
-		if(C_status and ! PRE_C_status) // 0 -> 1
-		{
-			lb->insertPotion("C劑", "PLC自動添加");
-		}
-		PRE_C_status = C_status;
-		D_status = plc->ReadPoint_PLC("CIO", 12, 9, false);
-		if(D_status and ! PRE_D_status) // 0 -> 1
-		{
-			lb->insertPotion("D劑", "PLC自動添加");
-		}
-		PRE_D_status = D_status;
-		Thread::sleep(500);
+		this->_ActiveMethod(payload.str());
 	}
+
+	PPRstatus = plc->ReadPoint_PLC("DM", 20004, 0, false);
+	if(PPRstatus != PRE_PPRstatus)
+	{
+		logger.information("設備狀態: %d -> %d",PRE_PPRstatus, PPRstatus);
+	}
+
+	if(PRE_PPRstatus != 1 && PPRstatus == 1)
+	{
+		//入料
+		insertHistory();
+	}
+	else if(PRE_PPRstatus == 5 && PPRstatus == 6)
+	{
+		//出料
+		updateHistory();
+	}
+	PRE_PPRstatus = PPRstatus;
+
+	/*自動添加系統*/
+	C_status = plc->ReadPoint_PLC("CIO", 12, 8, false);
+	if(C_status and ! PRE_C_status) // 0 -> 1
+	{
+		lb->insertPotion("C劑", "PLC自動添加");
+	}
+	PRE_C_status = C_status;
+	D_status = plc->ReadPoint_PLC("CIO", 12, 9, false);
+	if(D_status and ! PRE_D_status) // 0 -> 1
+	{
+		lb->insertPotion("D劑", "PLC自動添加");
+	}
+	PRE_D_status = D_status;
 }
 
 bool Prod::ReadyProd(JSON::Object::Ptr data)
@@ -1045,6 +1031,36 @@ void Prod::handleAlarm(AlarmNotification* pNf)
 	pNf->release();
 }
 
+bool Prod::updateProd(JSON::Object::Ptr p)
+{
+	logger.information("更新參數->Prod.json");
+	std::ostringstream Prod_oss;
+	p->stringify(Prod_oss);
+	Path pwd(config->getString("application.dir"), Path::PATH_UNIX);
+	pwd.setFileName("Prod.json");
+	std::ofstream Prod_ofs(pwd.toString().c_str(), std::ios::trunc);
+	Prod_ofs << Prod_oss.str();
+	Prod_ofs.close();
+	return true;
+}
+
+JSON::Object::Ptr Prod::LoadProd()
+{
+	Path ProdFile(config->getString("application.dir"), Path::PATH_UNIX);
+	ProdFile.setFileName("Prod.json");
+	File generateFile(ProdFile);
+	recipe rcp;
+	std::ostringstream ostr;
+	if(!generateFile.exists())
+	{
+		throw ApplicationException("無 Prod.json");
+	}
+	FileInputStream fis(ProdFile.toString());
+	StreamCopier::copyStream(fis, ostr);
+	Parser parser;
+	return parser.parse(ostr.str()).extract<JSON::Object::Ptr>();
+}
+
 void Prod::toTSDB(const std::string& payload)
 {
 	URI target;
@@ -1113,6 +1129,47 @@ void Prod::insertHistory()
 	generateFile.copyTo(ProdFile.toString());
 	lb->insertMO(rcp);
 }
+
+void Prod::updateHistory()
+{
+	logger.information("執行出料程序");
+	try
+	{
+		lb->updateMO();
+
+		JSON::Object query;
+		query.set("query", "FOR doc IN History SORT doc.STARTDATETIME DESC LIMIT 1 RETURN doc");
+		query.set("count", true);
+		JSON::Object::Ptr result = ab->Bridge(HTTPRequest::HTTP_POST, "/_db/VCP-30/_api/cursor", query);
+		if(result->getValue<bool>("error"))
+		{
+			throw ApplicationException(result->getValue<std::string>("errorMessage"));
+		}
+		JSON::Object::Ptr last = result->getArray("result")->getObject(0);
+		if(last->has("ENDDATETIME"))
+		{
+			throw ApplicationException("生產履歷已被更新過");
+		}
+		logger.information("準備更新生產履歷");
+		query.set("query", "FOR doc IN History "
+				"SORT doc.STARTDATETIME DESC "
+				"LIMIT 1 "
+				"UPDATE doc "
+				"WITH { ENDDATETIME: DATE_FORMAT( DATE_ADD(DATE_NOW(), 8, 'H'), '%yyyy-%mm-%dd %hh:%ii:%ss') } "
+				"IN History");
+		result = ab->Bridge(HTTPRequest::HTTP_POST, "/_db/VCP-30/_api/cursor", query);
+		if(result->getValue<bool>("error"))
+		{
+			throw ApplicationException(result->getValue<std::string>("errorMessage"));
+		}
+		logger.information("生產履歷更新成功");
+	}
+    catch (Exception &e)
+    {
+        logger.error(e.displayText());
+    }
+}
+
 
 std::string Prod::random_string( size_t length )
 {
