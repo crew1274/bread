@@ -107,6 +107,12 @@ void OmronPLC::InitIpAddress(char *local_address, const char *plc_address)
 
 }
 
+int OmronPLC::reConnect()
+{
+	Shutdown();
+	return Connect(hostaddr_b, port_b, eth_name_b, protocoltype_b);
+}
+
 /**
  * @brief       Connect to OMRON PLC
  *
@@ -122,7 +128,11 @@ int OmronPLC::Connect(const char *hostaddr,
                       const char *eth_name,
                       ProtocolTypeTable protocoltype)
 {
-    char eth_name_temp[16] = ETH_NAME;
+	hostaddr_b = hostaddr;
+	port_b = port;
+	eth_name_b = eth_name;
+	protocoltype_b = protocoltype;
+	char eth_name_temp[16] = ETH_NAME;
 
     if(eth_name != NULL)
         strncpy(eth_name_temp, eth_name, sizeof(eth_name_temp));

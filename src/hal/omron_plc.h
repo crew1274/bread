@@ -298,6 +298,8 @@ public:
      */
     void Shutdown();
 
+    int reConnect();
+
 private:
 
     /**
@@ -411,6 +413,12 @@ private:
     uint TransferDataToValue(char *data,
                              uint data_size,
                              bool hex_as_dec);
+protected:
+
+	const char *hostaddr_b;
+	int port_b;
+	const char *eth_name_b;
+	ProtocolTypeTable protocoltype_b;
 
 };
 

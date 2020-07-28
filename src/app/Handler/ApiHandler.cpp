@@ -116,6 +116,21 @@ void ApiHandler::handleRequest(HTTPServerRequest& request, HTTPServerResponse& r
 		{
 			MainObject.set("DM3500", 1);
 		}
+		else if(PathSegments[1] == "reconnect" && request.getMethod() == HTTPRequest::HTTP_GET)
+		{
+			if(PathSegments[2] == "1")
+			{
+				if(prod->plc->reConnect() == -1)
+				{
+					throw ApplicationException("重新連線主站PLC失敗");
+				}
+				else
+				{
+					logger.information("重新連線主站PLC");
+					MainObject.set("response", true);
+				}
+			}
+		}
 		else if(PathSegments[1] == "getRD05M136" && request.getMethod() == HTTPRequest::HTTP_POST)
 		{
 			ReciveObject = parser.parse(s).extract<JSON::Object::Ptr>();
@@ -229,7 +244,17 @@ void ApiHandler::handleRequest(HTTPServerRequest& request, HTTPServerResponse& r
 				if(ReciveObject->has("ppr_result") and ReciveObject->has("ppr_data"))
 				{
 					logger.information("請求寫入暫存區");
-					MainObject.set("response", prod->ReadyProd(ReciveObject));
+					if(prod->ReadyProd(ReciveObject))
+					{
+						MainObject.set("response", true);
+					}
+					else
+					{
+						//重新連線
+						prod->plc->reConnect();
+						MainObject.set("response", prod->ReadyProd(ReciveObject));
+					}
+
 				}
 			}
 			else if(PathSegments[2] == "prod" && request.getMethod() == HTTPRequest::HTTP_POST)	//啟動自動模式
@@ -374,6 +399,37 @@ void ApiHandler::handleRequest(HTTPServerRequest& request, HTTPServerResponse& r
 					inner.set("LotNO", target);
 					prod->theEvent(this, inner);
 				}
+			}
+		}
+		else if(PathSegments[1] == "predict")
+		{
+			std::vector<std::string> args;
+			Pipe outPipe;
+			std::string initialDirectory;
+			args.push_back("-W");
+			args.push_back("ignore");
+			args.push_back(prod->config->getString("ALGORITHM.VM_PROGRAM_NAME", "VCP3_code.py"));
+			args.push_back(PathSegments[2]);
+
+			initialDirectory = prod->config->getString("application.dir")+"/python/";
+			ProcessHandle PH = Process::launch("python3.5", args, initialDirectory, 0, &outPipe, &outPipe);
+			PipeInputStream istr(outPipe);
+			PH.wait();
+			string result((istreambuf_iterator<char>(istr)), istreambuf_iterator<char>());
+			logger.information("%s", result);
+			std::string predict_result;
+			if(result.size() > 2 && result.substr(0,2) == "OK")
+			{
+				logger.information("%s預測完成", PathSegments[2]);
+				predict_result = prod->rb->get(PathSegments[2]);
+				MainObject.set("response", NumberParser::parseFloat(predict_result));
+			}
+			else
+			{
+				logger.warning("%s預測失敗", PathSegments[2]);
+				MainObject.set("response", false);
+				MainObject.set("error", true);
+				MainObject.set("errorMessage", prod->rb->get("errorMessage"));
 			}
 		}
 		else
