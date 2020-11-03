@@ -120,7 +120,8 @@ void ApiHandler::handleRequest(HTTPServerRequest& request, HTTPServerResponse& r
 		{
 			if(PathSegments[2] == "1")
 			{
-				if(prod->plc->reConnect() == -1)
+				prod->plc->Shutdown();
+				if(prod->plc->Connect(prod->config->getString("PLC.IP").c_str(), 9600, "eth0", PROTOCOLTYPE_TCP) == -1)
 				{
 					throw ApplicationException("重新連線主站PLC失敗");
 				}

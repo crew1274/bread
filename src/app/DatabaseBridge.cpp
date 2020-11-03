@@ -784,7 +784,7 @@ bool LocalBridge::getERROR(std::vector<ERRORmessage> &msg)
 	Session session("SQLite", db_path->toString());
 	ERRORmessage Emsg;
 	Statement select(session);
-    select << "SELECT DATETIME, MESSAGE, DEVICE, STATUS FROM ERROR ORDER by ID DESC", into(Emsg.datetime),
+    select << "SELECT DATETIME, MESSAGE, DEVICE, STATUS FROM ERROR ORDER by ID DESC LIMIT 200", into(Emsg.datetime),
     		into(Emsg.message), into(Emsg.device), into(Emsg.status), range(0, 1);
     while (!select.done())
     {
